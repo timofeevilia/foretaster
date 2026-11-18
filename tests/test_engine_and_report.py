@@ -78,7 +78,9 @@ def test_report_summary_and_json_roundtrip() -> None:
 def test_empty_report() -> None:
     report = build_report([], [], ScanResult((), ()))
     assert report.worst() is None
-    assert render(report) == "Scanned 0 configuration file(s), 0 server(s). No findings.\n"
+    assert (
+        render(report) == "Scanned 0 configuration file(s), 0 server(s), 0 tool(s). No findings.\n"
+    )
 
 
 def render(report: Report) -> str:

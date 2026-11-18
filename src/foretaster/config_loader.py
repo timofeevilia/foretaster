@@ -52,7 +52,7 @@ def load_config(
 
     ``client`` is guessed from the file name and contents when omitted.
     """
-    return parse_config(_read(path), path=path, client=client, scope=scope)
+    return parse_config(read_text(path), path=path, client=client, scope=scope)
 
 
 def parse_config(
@@ -125,7 +125,8 @@ def guess_client(path: Path, data: dict[str, Any]) -> Client:
     return Client.GENERIC
 
 
-def _read(path: Path) -> str:
+def read_text(path: Path) -> str:
+    """Read a UTF-8 file, refusing anything that is not a regular file of sane size."""
     try:
         if not path.is_file():
             raise ConfigLoadError(path, "not a regular file")

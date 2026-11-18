@@ -9,7 +9,8 @@ from pydantic import BaseModel, ConfigDict
 from foretaster import __version__
 from foretaster.discovery import LoadFailure
 from foretaster.engine import ScanResult
-from foretaster.models import AgentConfig, Finding, Severity
+from foretaster.live import ConnectionFailure
+from foretaster.models import AgentConfig, Finding, ServerInventory, Severity
 
 
 class _Model(BaseModel):
@@ -24,13 +25,14 @@ class ToolInfo(_Model):
 class Summary(_Model):
     configs: int
     servers: int
+    tools: int
     findings: dict[Severity, int]
 
 
 class ReportError(_Model):
     """Something that kept the scan from being complete."""
 
-    kind: Literal["config", "rule"]
+    kind: Literal["config", "server", "rule"]
     subject: str
     message: str
 
@@ -50,26 +52,44 @@ class Report(_Model):
 
 
 def build_report(
-    configs: Sequence[AgentConfig], failures: Sequence[LoadFailure], result: ScanResult
+    configs: Sequence[AgentConfig],
+    failures: Sequence[LoadFailure],
+    result: ScanResult,
+    inventories: Sequence[ServerInventory] = (),
+    connection_failures: Sequence[ConnectionFailure] = (),
 ) -> Report:
     counts = {severity: 0 for severity in Severity}
     for finding in result.findings:
         counts[finding.severity] += 1
-    errors = [
-        ReportError(kind="config", subject=str(failure.candidate.path), message=failure.reason)
-        for failure in failures
-    ] + [
-        ReportError(kind="rule", subject=error.rule_id, message=error.message)
-        for error in result.rule_errors
+    errors = (
+        [
+            ReportError(kind="config", subject=str(failure.candidate.path), message=failure.reason)
+            for failure in failures
+        ]
+        + [
+            ReportError(kind="server", subject=failure.server, message=failure.reason)
+            for failure in connection_failures
+        ]
+        + [
+            ReportError(kind="rule", subject=error.rule_id, message=error.message)
+            for error in result.rule_errors
+        ]
+    )
+    sources = [(config.path, None) for config in configs] + [
+        (inventory.origin.path, None) for inventory in inventories
     ]
+    servers = {(config.path, server.name) for config in configs for server in config.servers} | {
+        (inventory.origin.path, inventory.server) for inventory in inventories
+    }
     return Report(
         tool=ToolInfo(version=__version__),
         summary=Summary(
             configs=len(configs),
-            servers=sum(len(config.servers) for config in configs),
+            servers=len(servers),
+            tools=sum(len(inventory.tools) for inventory in inventories),
             findings=counts,
         ),
-        scanned=tuple(config.path for config in configs),
+        scanned=tuple(dict.fromkeys(path for path, _ in sources)),
         findings=result.findings,
         errors=tuple(errors),
     )
