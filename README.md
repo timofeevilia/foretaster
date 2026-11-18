@@ -13,9 +13,9 @@ agent is about to trust and reports the poisoned ones before the agent
 swallows them.
 
 > **Status: pre-alpha.** The scanner core is feature-complete: 19 rules, four
-> report formats, rug-pull detection. A first measurement on an independent
-> corpus, next to one other scanner, is published [below](#benchmark). See the
-> [roadmap](#roadmap).
+> report formats, rug-pull detection. Measurements on two independent corpora
+> are published [below](#benchmark): 94% of attacks flagged on one, 33% on the
+> other. See the [roadmap](#roadmap).
 
 ## Why
 
@@ -267,15 +267,31 @@ its offline mode. Figures are from the held-out test split (178 poisoned and
 | Genuine tools wrongly flagged, each server alone | 0.6% (1/160) | 0.6% (1/160) | 0.6% (1/160) |
 | Genuine tools wrongly flagged, all servers together | 13.1% (21/160) | 0.6% (1/160) | 0.6% (1/160) |
 
-What this table does not say:
+Those rules were improved on the other half of MCPTox, so the same version was
+then run on a second, small corpus by three unrelated authors, which was never
+used for tuning:
 
-- Foretaster's rules were improved on the other half of this corpus. The test
-  split shows they carry over to unseen servers, not to attacks written in
-  another style; no second corpus has been run.
-- The Cisco scanner was run in its free offline configuration only. Its LLM and
-  cloud analyzers were not measured and would likely do better.
-- Most of Foretaster's detections are graded `medium`. At `high`, which fails
-  CI by default, it flags 52.2% of poisoned tools scanned alone.
+| Question | Foretaster 0.1.0 | Cisco MCP Scanner 4.8.7, YARA only |
+|---|---|---|
+| Malicious tool lists flagged | 32.6% (15/46) | 21.7% (10/46) |
+| Benign tool lists wrongly flagged | 50.0% (4/8) | 25.0% (2/8) |
+
+Read the two tables together:
+
+- **The 94% does not carry over.** Foretaster catches attacks that use
+  recognisable devices: fake system tags, invisible characters, references to
+  credential files. Payloads written to avoid that vocabulary get past it; on
+  the one source built that way, both scanners catch 3 of 33.
+- **The benign lists in the second corpus are traps**, such as an SSH key
+  manager. Foretaster flagged four of eight. On MCPTox's 362 genuine tools the
+  rate was 0.3%.
+- **The second corpus is small.** It shows "about a third" and "much worse than
+  on MCPTox"; it does not rank the two scanners.
+- **The Cisco scanner was run in its free offline configuration only.** Its LLM
+  and cloud analyzers were not measured and would likely do better.
+
+Pattern rules find attacks whose wording has been seen before. That is useful
+and not enough, which is why an optional LLM layer is next on the roadmap.
 
 Method, caveats and full tables: [benchmark/README.md](benchmark/README.md).
 
@@ -309,7 +325,7 @@ below 90% fails the build.
 | Stage | Deliverable | State |
 |---|---|---|
 | 1 | Scanner core: config discovery, rule engine, 19 rules, JSON / SARIF / HTML reports, rug-pull detection | done |
-| 2 | Benchmark: Foretaster and other scanners measured on independent corpora | in progress: one corpus and one other scanner measured; a second corpus is next |
+| 2 | Benchmark: Foretaster and other scanners measured on independent corpora | done: two corpora and one other scanner measured |
 | 3 | Project site: documentation, benchmark charts, in-browser config check | planned |
 | 4 | GitHub Action, PyPI release, optional LLM layer | planned |
 | 5 | Honeypot for attacks on AI infrastructure, feeding new rules | planned |

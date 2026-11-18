@@ -1,0 +1,336 @@
+{
+  "schema_version": "2",
+  "kind": "cases",
+  "scanner": {
+    "name": "cisco-mcp-scanner (YARA only)",
+    "version": "4.8.7",
+    "notes": [
+      "Offline YARA analyzer only; the LLM and Cisco AI Defense analyzers were not used.",
+      "Judges each tool on its own, so both detection scenarios give the same verdicts."
+    ]
+  },
+  "suite": {
+    "name": "wild",
+    "description": "Tool-poisoning examples by three unrelated authors",
+    "notes": [
+      "Every case is test-only; no rule was changed in response to this suite.",
+      "A case is one whole tool list. It counts as flagged when any tool in it is.",
+      "17 MCP-Poison-Bench payloads inject only after a tool call and are excluded: no scan-time tool can see them.",
+      "MCP-Poison-Bench cross-server cases are scanned beside the trusted server they target, as that benchmark runs them."
+    ],
+    "malicious_cases": 46,
+    "benign_cases": 8,
+    "sources": [
+      {
+        "name": "mcp-guardbench",
+        "url": "https://github.com/getmcpm/mcp-guardbench",
+        "revision": "13445a84989a1fee1038e82e04e911117a1bc08e",
+        "licence": "MIT",
+        "malicious_cases": 10,
+        "benign_cases": 7
+      },
+      {
+        "name": "MCP-Poison-Bench",
+        "url": "https://github.com/chirag-dewan/MCP-Poison-Bench",
+        "revision": "21a77a4c963fe24f92f01aaf80f0df1173fd681a",
+        "licence": "MIT",
+        "malicious_cases": 33,
+        "benign_cases": 1
+      },
+      {
+        "name": "mcp-injection-experiments",
+        "url": "https://github.com/invariantlabs-ai/mcp-injection-experiments",
+        "revision": "7382a5e64d825b2c7c2bace11f8fb9f2f16e01e2",
+        "licence": "no licence stated",
+        "malicious_cases": 3,
+        "benign_cases": 0
+      }
+    ]
+  },
+  "detection": {
+    "rates": {
+      "low": {
+        "hits": 10,
+        "total": 46,
+        "rate": 0.2174,
+        "ci95_low": 0.1226,
+        "ci95_high": 0.3557
+      },
+      "medium": {
+        "hits": 10,
+        "total": 46,
+        "rate": 0.2174,
+        "ci95_low": 0.1226,
+        "ci95_high": 0.3557
+      },
+      "high": {
+        "hits": 10,
+        "total": 46,
+        "rate": 0.2174,
+        "ci95_low": 0.1226,
+        "ci95_high": 0.3557
+      }
+    },
+    "by_source": {
+      "mcp-guardbench": {
+        "low": {
+          "hits": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95_low": 0.1682,
+          "ci95_high": 0.6873
+        },
+        "medium": {
+          "hits": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95_low": 0.1682,
+          "ci95_high": 0.6873
+        },
+        "high": {
+          "hits": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95_low": 0.1682,
+          "ci95_high": 0.6873
+        }
+      },
+      "MCP-Poison-Bench": {
+        "low": {
+          "hits": 3,
+          "total": 33,
+          "rate": 0.0909,
+          "ci95_low": 0.0314,
+          "ci95_high": 0.2357
+        },
+        "medium": {
+          "hits": 3,
+          "total": 33,
+          "rate": 0.0909,
+          "ci95_low": 0.0314,
+          "ci95_high": 0.2357
+        },
+        "high": {
+          "hits": 3,
+          "total": 33,
+          "rate": 0.0909,
+          "ci95_low": 0.0314,
+          "ci95_high": 0.2357
+        }
+      },
+      "mcp-injection-experiments": {
+        "low": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1.0,
+          "ci95_low": 0.4385,
+          "ci95_high": 1.0
+        },
+        "medium": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1.0,
+          "ci95_low": 0.4385,
+          "ci95_high": 1.0
+        },
+        "high": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1.0,
+          "ci95_low": 0.4385,
+          "ci95_high": 1.0
+        }
+      }
+    },
+    "by_category": {
+      "OWASP-MCP-1": {
+        "low": {
+          "hits": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95_low": 0.1682,
+          "ci95_high": 0.6873
+        },
+        "medium": {
+          "hits": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95_low": 0.1682,
+          "ci95_high": 0.6873
+        },
+        "high": {
+          "hits": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95_low": 0.1682,
+          "ci95_high": 0.6873
+        }
+      },
+      "cross_server": {
+        "low": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        },
+        "medium": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        },
+        "high": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        }
+      },
+      "original demonstration": {
+        "low": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1.0,
+          "ci95_low": 0.4385,
+          "ci95_high": 1.0
+        },
+        "medium": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1.0,
+          "ci95_low": 0.4385,
+          "ci95_high": 1.0
+        },
+        "high": {
+          "hits": 3,
+          "total": 3,
+          "rate": 1.0,
+          "ci95_low": 0.4385,
+          "ci95_high": 1.0
+        }
+      },
+      "schema_field": {
+        "low": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        },
+        "medium": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        },
+        "high": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        }
+      },
+      "tool_description": {
+        "low": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        },
+        "medium": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        },
+        "high": {
+          "hits": 1,
+          "total": 11,
+          "rate": 0.0909,
+          "ci95_low": 0.0162,
+          "ci95_high": 0.3774
+        }
+      }
+    },
+    "labels": {
+      "CREDENTIAL HARVESTING": 4,
+      "DATA EXFILTRATION": 1,
+      "PROMPT INJECTION": 5,
+      "TOOL POISONING": 1
+    },
+    "missed": [
+      "guardbench/exfil-param-in-schema",
+      "guardbench/owasp-mcp-1-ansi-in-description",
+      "guardbench/owasp-mcp-1-bidi-in-description",
+      "guardbench/owasp-mcp-1-multitool-poisoning",
+      "guardbench/owasp-mcp-1-system-tag",
+      "guardbench/owasp-mcp-1-zwsp-in-description",
+      "poison-bench/adversarial_payloads/adv-td-homoglyph-soft",
+      "poison-bench/heldout_payloads/ho-sf-cache",
+      "poison-bench/heldout_payloads/ho-sf-chatty",
+      "poison-bench/heldout_payloads/ho-sf-config",
+      "poison-bench/heldout_payloads/ho-sf-format",
+      "poison-bench/heldout_payloads/ho-sf-md",
+      "poison-bench/heldout_payloads/ho-sf-selector",
+      "poison-bench/heldout_payloads/ho-sf-terse",
+      "poison-bench/heldout_payloads/ho-sf-units",
+      "poison-bench/heldout_payloads/ho-sf-validate",
+      "poison-bench/heldout_payloads/ho-sf-verbose",
+      "poison-bench/heldout_payloads/ho-td-changelog",
+      "poison-bench/heldout_payloads/ho-td-chatty",
+      "poison-bench/heldout_payloads/ho-td-config",
+      "poison-bench/heldout_payloads/ho-td-handshake",
+      "poison-bench/heldout_payloads/ho-td-ledger",
+      "poison-bench/heldout_payloads/ho-td-md",
+      "poison-bench/heldout_payloads/ho-td-mirror",
+      "poison-bench/heldout_payloads/ho-td-normalize",
+      "poison-bench/heldout_payloads/ho-td-telemetry",
+      "poison-bench/heldout_payloads/ho-xs-cache",
+      "poison-bench/heldout_payloads/ho-xs-chatty",
+      "poison-bench/heldout_payloads/ho-xs-config",
+      "poison-bench/heldout_payloads/ho-xs-health",
+      "poison-bench/heldout_payloads/ho-xs-ledger",
+      "poison-bench/heldout_payloads/ho-xs-md",
+      "poison-bench/heldout_payloads/ho-xs-mirror",
+      "poison-bench/heldout_payloads/ho-xs-sync",
+      "poison-bench/heldout_payloads/ho-xs-terse",
+      "poison-bench/heldout_payloads/ho-xs-verbose"
+    ]
+  },
+  "false_positives": {
+    "rates": {
+      "low": {
+        "hits": 2,
+        "total": 8,
+        "rate": 0.25,
+        "ci95_low": 0.0715,
+        "ci95_high": 0.5907
+      },
+      "medium": {
+        "hits": 2,
+        "total": 8,
+        "rate": 0.25,
+        "ci95_low": 0.0715,
+        "ci95_high": 0.5907
+      },
+      "high": {
+        "hits": 2,
+        "total": 8,
+        "rate": 0.25,
+        "ci95_low": 0.0715,
+        "ci95_high": 0.5907
+      }
+    },
+    "flagged": [
+      "guardbench/ssh-key-management-tools-list",
+      "guardbench/wallet-non-custodial-disclaimer"
+    ]
+  }
+}
