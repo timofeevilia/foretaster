@@ -5,8 +5,17 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import ClassVar, NamedTuple
 
-from foretaster.models import AgentConfig, Finding, Location, ServerDefinition, Severity
+from foretaster.models import (
+    AgentConfig,
+    Finding,
+    Location,
+    ServerDefinition,
+    ServerInventory,
+    Severity,
+    ToolDefinition,
+)
 from foretaster.redact import scrub
+from foretaster.textscan import printable, schema_texts
 
 # Verified against the OWASP MCP Top 10 project repository (2025 list, beta).
 OWASP_MCP = {
@@ -37,11 +46,49 @@ class ScanTarget(NamedTuple):
     """Everything a scan knows about. Rules must treat it as read-only."""
 
     configs: tuple[AgentConfig, ...]
+    inventories: tuple[ServerInventory, ...] = ()
+
+    def texts(self) -> Iterator["TextItem"]:
+        """Yield every piece of server-supplied text that a model would read."""
+        for inventory in self.inventories:
+            base = inventory.origin.pointer
+            if inventory.instructions:
+                yield TextItem(
+                    inventory,
+                    None,
+                    f"{base}/instructions",
+                    "server instructions",
+                    inventory.instructions,
+                )
+            for index, tool in enumerate(inventory.tools):
+                prefix = f"{base}/tools/{index}"
+                if tool.description:
+                    yield TextItem(
+                        inventory,
+                        tool,
+                        f"{prefix}/description",
+                        "tool description",
+                        tool.description,
+                    )
+                for suffix, text in schema_texts(tool.input_schema):
+                    yield TextItem(
+                        inventory, tool, f"{prefix}/inputSchema{suffix}", "parameter schema", text
+                    )
 
     def servers(self) -> Iterator[tuple[AgentConfig, ServerDefinition]]:
         for config in self.configs:
             for server in config.servers:
                 yield config, server
+
+
+class TextItem(NamedTuple):
+    """A piece of untrusted text and where it came from."""
+
+    inventory: ServerInventory
+    tool: ToolDefinition | None
+    pointer: str
+    label: str
+    text: str
 
 
 class Rule(ABC):
@@ -78,6 +125,33 @@ class Rule(ABC):
             ),
             server=server.name if server else None,
             evidence=scrub(evidence) if evidence else None,
+            remediation=self.meta.remediation,
+            references=self.meta.references,
+        )
+
+    def text_finding(
+        self,
+        item: TextItem,
+        message: str,
+        *,
+        evidence: str | None = None,
+        severity: Severity | None = None,
+    ) -> Finding:
+        """Build a finding about server-supplied text.
+
+        The text is attacker-controlled, so non-printable characters are
+        escaped before anything derived from it reaches a report.
+        """
+        origin = item.inventory.origin
+        return Finding(
+            rule_id=self.meta.id,
+            title=self.meta.title,
+            severity=severity or self.meta.severity,
+            message=scrub(printable(message)),
+            location=Location(path=origin.path, pointer=item.pointer, line=origin.line),
+            server=item.inventory.server,
+            tool=item.tool.name if item.tool else None,
+            evidence=scrub(printable(evidence)) if evidence else None,
             remediation=self.meta.remediation,
             references=self.meta.references,
         )

@@ -14,10 +14,11 @@ from foretaster import __version__
 from foretaster.config_loader import ConfigLoadError, load_config
 from foretaster.discovery import Candidate, DiscoveryResult, LoadFailure, discover
 from foretaster.engine import run_rules
-from foretaster.models import AgentConfig, Client, Scope, Severity
+from foretaster.models import AgentConfig, Client, Scope, ServerInventory, Severity
 from foretaster.report import Report, build_report
 from foretaster.report.console import render_console
 from foretaster.rules import ALL_RULES, ScanTarget
+from foretaster.tool_manifest import load_tool_manifest
 
 EXIT_FINDINGS = 1
 EXIT_INCOMPLETE = 2
@@ -170,6 +171,15 @@ def scan(
             dir_okay=False,
         ),
     ] = None,
+    tools: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--tools",
+            help="Saved tool list of a server (a tools/list result) to scan. Repeatable.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
     project_dir: Annotated[
         Path,
         typer.Option(
@@ -196,8 +206,10 @@ def scan(
     Reads files only: no server is started or contacted. Exit status is 0 when
     clean, 1 when findings reach --fail-on, 2 when the scan was incomplete.
     """
-    configs, failures = _load(paths, project_dir)
-    report = build_report(configs, failures, run_rules(ScanTarget(tuple(configs))))
+    configs, failures = _load(paths, project_dir, discover_all=not paths and not tools)
+    inventories = _load_manifests(tools or [], failures)
+    target = ScanTarget(tuple(configs), tuple(inventories))
+    report = build_report(configs, failures, run_rules(target), inventories)
 
     if output_format is OutputFormat.JSON:
         text = report.model_dump_json(indent=2) + "\n"
@@ -226,15 +238,25 @@ def rules_command() -> None:
     Console().print(table)
 
 
+def _load_manifests(paths: list[Path], failures: list[LoadFailure]) -> list[ServerInventory]:
+    inventories: list[ServerInventory] = []
+    for path in paths:
+        try:
+            inventories.extend(load_tool_manifest(path))
+        except ConfigLoadError as exc:
+            failures.append(LoadFailure(Candidate(Client.GENERIC, Scope.USER, path), exc.reason))
+    return inventories
+
+
 def _load(
-    paths: list[Path] | None, project_dir: Path
+    paths: list[Path] | None, project_dir: Path, *, discover_all: bool
 ) -> tuple[list[AgentConfig], list[LoadFailure]]:
-    if not paths:
+    if discover_all:
         result = discover(cwd=project_dir)
         return list(result.configs), list(result.failures)
     configs: list[AgentConfig] = []
     failures: list[LoadFailure] = []
-    for path in paths:
+    for path in paths or []:
         try:
             configs.append(load_config(path))
         except ConfigLoadError as exc:

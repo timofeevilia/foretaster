@@ -38,6 +38,11 @@ Issues = "https://github.com/timofeevilia/foretaster/issues"
 [project.scripts]
 foretaster = "foretaster.cli:app"
 
+[project.optional-dependencies]
+connect = [
+    "mcp>=2,<3",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.11",
@@ -68,7 +73,7 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "RUF001"]
 
 [tool.mypy]
 strict = true

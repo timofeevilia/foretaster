@@ -109,6 +109,24 @@ class Location(_Model):
     line: int | None = None
 
 
+class ToolDefinition(_Model):
+    """One tool as advertised by an MCP server. All of it is untrusted text."""
+
+    name: str
+    description: str = ""
+    input_schema: dict[str, Any] = {}
+
+
+class ServerInventory(_Model):
+    """What a server advertises to the model: its tools and instructions."""
+
+    server: str
+    origin: Location
+    """The config entry or manifest file this inventory was obtained from."""
+    instructions: str | None = None
+    tools: tuple[ToolDefinition, ...] = ()
+
+
 class Finding(_Model):
     """One issue reported by a rule.
 
@@ -122,6 +140,7 @@ class Finding(_Model):
     message: str
     location: Location
     server: str | None = None
+    tool: str | None = None
     evidence: str | None = None
     remediation: str
     references: tuple[str, ...] = ()

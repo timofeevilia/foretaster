@@ -29,8 +29,8 @@ def render_console(report: Report, console: Console) -> None:
         f"{count} {severity.value}" for severity, count in summary.findings.items() if count
     )
     console.print(
-        f"Scanned {summary.configs} configuration file(s), {summary.servers} server(s). "
-        + (f"Findings: {counts}." if counts else "No findings.")
+        f"Scanned {summary.configs} configuration file(s), {summary.servers} server(s), "
+        f"{summary.tools} tool(s). " + (f"Findings: {counts}." if counts else "No findings.")
     )
     if report.errors:
         console.print(f"[red]{len(report.errors)} error(s): the scan is incomplete.[/red]")
@@ -41,7 +41,9 @@ def _render_finding(finding: Finding, console: Console) -> None:
     location = str(finding.location.path)
     if finding.location.line:
         location += f":{finding.location.line}"
-    if finding.server:
+    if finding.server and finding.tool:
+        location += f" (server {finding.server!r}, tool {finding.tool!r})"
+    elif finding.server:
         location += f" (server {finding.server!r})"
     console.print(
         f"[{style}]{finding.severity.value.upper()}[/{style}] "
