@@ -67,7 +67,7 @@ Foretaster does, not whether it does better than anything else.
   `high` and above (fails a CI run by default).
 - **Confidence intervals** are 95% Wilson score intervals.
 - **Pinned data.** The corpus is downloaded at a fixed commit and verified by
-  SHA-256. It is not copied into this repository.
+  SHA-256 rather than copied into this repository.
 
 ### Keeping the measurement honest
 
@@ -116,5 +116,6 @@ Poisoning on Real-World MCP Servers." AAAI 2026.
 [doi:10.1609/aaai.v40i42.40895](https://doi.org/10.1609/aaai.v40i42.40895).
 Benchmark materials are licensed
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The results published
-here are derived from those materials; the materials themselves are not
-redistributed.
+here are derived from those materials. The corpus itself is not redistributed;
+the JSON result file quotes the first 400 characters of each missed dev-split
+case, unchanged, under the same licence.
