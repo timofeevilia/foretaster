@@ -15,11 +15,18 @@ _STYLE = {
 }
 
 
+_ERROR_LABEL = {
+    "config": "Could not parse",
+    "server": "Could not connect to server",
+    "rule": "Rule failed",
+}
+
+
 def render_console(report: Report, console: Console) -> None:
     for finding in report.findings:
         _render_finding(finding, console)
     for error in report.errors:
-        label = "Could not parse" if error.kind == "config" else "Rule failed"
+        label = _ERROR_LABEL[error.kind]
         console.print(f"[red]{label}[/red] {escape(error.subject)}: {escape(error.message)}")
     if report.errors:
         console.print()

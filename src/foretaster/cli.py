@@ -14,6 +14,7 @@ from foretaster import __version__
 from foretaster.config_loader import ConfigLoadError, load_config
 from foretaster.discovery import Candidate, DiscoveryResult, LoadFailure, discover
 from foretaster.engine import run_rules
+from foretaster.live import DEFAULT_TIMEOUT, ConnectionFailure, ConnectUnavailableError, collect
 from foretaster.models import AgentConfig, Client, Scope, ServerInventory, Severity
 from foretaster.report import Report, build_report
 from foretaster.report.console import render_console
@@ -189,6 +190,18 @@ def scan(
             exists=True,
         ),
     ] = Path("."),
+    connect: Annotated[
+        bool,
+        typer.Option(
+            "--connect",
+            help="Start or contact each configured server and scan the tools it advertises. "
+            "This runs the commands in your configuration. No tool is ever called.",
+        ),
+    ] = False,
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", help="Seconds to wait for each server with --connect.", min=1),
+    ] = DEFAULT_TIMEOUT,
     output_format: Annotated[
         OutputFormat, typer.Option("--format", help="Report format.")
     ] = OutputFormat.CONSOLE,
@@ -201,15 +214,24 @@ def scan(
         typer.Option("--fail-on", help="Exit with status 1 at or above this severity."),
     ] = FailOn.HIGH,
 ) -> None:
-    """Scan agent configurations for security problems.
+    """Scan agent configurations and tool descriptions for security problems.
 
-    Reads files only: no server is started or contacted. Exit status is 0 when
-    clean, 1 when findings reach --fail-on, 2 when the scan was incomplete.
+    Reads files only, unless --connect is given. Exit status is 0 when clean,
+    1 when findings reach --fail-on, 2 when the scan was incomplete.
     """
     configs, failures = _load(paths, project_dir, discover_all=not paths and not tools)
     inventories = _load_manifests(tools or [], failures)
+    unreachable: tuple[ConnectionFailure, ...] = ()
+    if connect:
+        try:
+            live = collect(configs, timeout=timeout)
+        except ConnectUnavailableError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(EXIT_INCOMPLETE) from exc
+        inventories.extend(live.inventories)
+        unreachable = live.failures
     target = ScanTarget(tuple(configs), tuple(inventories))
-    report = build_report(configs, failures, run_rules(target), inventories)
+    report = build_report(configs, failures, run_rules(target), inventories, unreachable)
 
     if output_format is OutputFormat.JSON:
         text = report.model_dump_json(indent=2) + "\n"

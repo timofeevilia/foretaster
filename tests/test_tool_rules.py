@@ -49,7 +49,8 @@ BENIGN = [
     "user before sending.",
     "Returns the current time. Commit 3f2a9c1b7d4e5f60718293a4b5c6d7e8f9a0b1c2 introduced "
     "the timezone argument.",
-    "Преобразует текст в верхний регистр. 文字列を大文字に変換します。 👨‍👩‍👧 family emoji is fine.",
+    "Преобразует текст в верхний регистр. 文字列を大文字に変換します。 "
+    "👨‍👩‍👧 family emoji is fine.",
     "Lists environment names (dev, staging, prod). Does not read .env.example files.",
 ]
 
