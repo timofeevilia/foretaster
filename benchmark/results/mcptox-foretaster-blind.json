@@ -1,8 +1,11 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "scanner": {
     "name": "foretaster",
-    "version": "0.0.1"
+    "version": "0.0.1",
+    "notes": [
+      "Deterministic rules only; no LLM layer exists yet."
+    ]
   },
   "suite": {
     "name": "mcptox",
@@ -21,6 +24,29 @@
   "detection": {
     "alone": {
       "rates": {
+        "low": {
+          "dev": {
+            "hits": 109,
+            "total": 307,
+            "rate": 0.355,
+            "ci95_low": 0.3036,
+            "ci95_high": 0.4101
+          },
+          "test": {
+            "hits": 70,
+            "total": 178,
+            "rate": 0.3933,
+            "ci95_low": 0.3245,
+            "ci95_high": 0.4665
+          },
+          "all": {
+            "hits": 179,
+            "total": 485,
+            "rate": 0.3691,
+            "ci95_low": 0.3273,
+            "ci95_high": 0.4129
+          }
+        },
         "medium": {
           "dev": {
             "hits": 109,
@@ -170,7 +196,7 @@
           "ci95_high": 0.1538
         }
       },
-      "rules": {
+      "labels": {
         "FT-T001": 154,
         "FT-T003": 41,
         "FT-T004": 12,
@@ -2323,6 +2349,29 @@
     },
     "beside_target": {
       "rates": {
+        "low": {
+          "dev": {
+            "hits": 300,
+            "total": 307,
+            "rate": 0.9772,
+            "ci95_low": 0.9537,
+            "ci95_high": 0.9889
+          },
+          "test": {
+            "hits": 160,
+            "total": 178,
+            "rate": 0.8989,
+            "ci95_low": 0.8458,
+            "ci95_high": 0.9351
+          },
+          "all": {
+            "hits": 460,
+            "total": 485,
+            "rate": 0.9485,
+            "ci95_low": 0.925,
+            "ci95_high": 0.9648
+          }
+        },
         "medium": {
           "dev": {
             "hits": 300,
@@ -2472,7 +2521,7 @@
           "ci95_high": 0.9309
         }
       },
-      "rules": {
+      "labels": {
         "FT-T001": 154,
         "FT-T003": 41,
         "FT-T004": 12,
@@ -2660,6 +2709,29 @@
   "false_positives": {
     "alone": {
       "rates": {
+        "low": {
+          "dev": {
+            "hits": 1,
+            "total": 202,
+            "rate": 0.005,
+            "ci95_low": 0.0009,
+            "ci95_high": 0.0275
+          },
+          "test": {
+            "hits": 1,
+            "total": 160,
+            "rate": 0.0063,
+            "ci95_low": 0.0011,
+            "ci95_high": 0.0345
+          },
+          "all": {
+            "hits": 2,
+            "total": 362,
+            "rate": 0.0055,
+            "ci95_low": 0.0015,
+            "ci95_high": 0.0199
+          }
+        },
         "medium": {
           "dev": {
             "hits": 1,
@@ -2707,22 +2779,44 @@
           }
         }
       },
-      "rules": {
+      "labels": {
         "FT-T001": 2
       },
       "dev_findings": [
         {
           "server": "Apify",
           "tool": "get-dataset-items",
-          "rule": "FT-T001",
+          "labels": "FT-T001",
           "severity": "medium",
-          "message": "The tool description contains a directive addressed to the model.",
-          "evidence": "…ma-separated lists. For nested objects, you must first flatten them using the flatten paramete…"
+          "detail": "The tool description contains a directive addressed to the model. …ma-separated lists. For nested objects, you must first flatten them using the flatten paramete…"
         }
       ]
     },
     "together": {
       "rates": {
+        "low": {
+          "dev": {
+            "hits": 22,
+            "total": 202,
+            "rate": 0.1089,
+            "ci95_low": 0.073,
+            "ci95_high": 0.1594
+          },
+          "test": {
+            "hits": 21,
+            "total": 160,
+            "rate": 0.1313,
+            "ci95_low": 0.0875,
+            "ci95_high": 0.1923
+          },
+          "all": {
+            "hits": 43,
+            "total": 362,
+            "rate": 0.1188,
+            "ci95_low": 0.0894,
+            "ci95_high": 0.1562
+          }
+        },
         "medium": {
           "dev": {
             "hits": 22,
@@ -2770,7 +2864,7 @@
           }
         }
       },
-      "rules": {
+      "labels": {
         "FT-D002": 41,
         "FT-T001": 2
       },
@@ -2778,178 +2872,156 @@
         {
           "server": "12306-mcp",
           "tool": "search",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (DumplingAI, GoogleDrive).",
-          "evidence": "search"
+          "detail": "Tool name is also used by another server (DumplingAI, GoogleDrive). search"
         },
         {
           "server": "Apify",
           "tool": "get-dataset-items",
-          "rule": "FT-T001",
+          "labels": "FT-T001",
           "severity": "medium",
-          "message": "The tool description contains a directive addressed to the model.",
-          "evidence": "…ma-separated lists. For nested objects, you must first flatten them using the flatten paramete…"
+          "detail": "The tool description contains a directive addressed to the model. …ma-separated lists. For nested objects, you must first flatten them using the flatten paramete…"
         },
         {
           "server": "ClickHouse",
           "tool": "list_tables",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (SQLite).",
-          "evidence": "list_tables"
+          "detail": "Tool name is also used by another server (SQLite). list_tables"
         },
         {
           "server": "Commander",
           "tool": "create_directory",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "create_directory"
+          "detail": "Tool name is also used by another server (FileSystem). create_directory"
         },
         {
           "server": "Commander",
           "tool": "get_file_info",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "get_file_info"
+          "detail": "Tool name is also used by another server (FileSystem). get_file_info"
         },
         {
           "server": "Commander",
           "tool": "list_directory",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "list_directory"
+          "detail": "Tool name is also used by another server (FileSystem). list_directory"
         },
         {
           "server": "Commander",
           "tool": "move_file",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "move_file"
+          "detail": "Tool name is also used by another server (FileSystem). move_file"
         },
         {
           "server": "Commander",
           "tool": "read_file",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "read_file"
+          "detail": "Tool name is also used by another server (FileSystem). read_file"
         },
         {
           "server": "Commander",
           "tool": "read_multiple_files",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "read_multiple_files"
+          "detail": "Tool name is also used by another server (FileSystem). read_multiple_files"
         },
         {
           "server": "Commander",
           "tool": "search_code",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "search_code"
+          "detail": "Tool name is also used by another server (Github). search_code"
         },
         {
           "server": "Commander",
           "tool": "search_files",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "search_files"
+          "detail": "Tool name is also used by another server (FileSystem). search_files"
         },
         {
           "server": "Commander",
           "tool": "write_file",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (FileSystem).",
-          "evidence": "write_file"
+          "detail": "Tool name is also used by another server (FileSystem). write_file"
         },
         {
           "server": "Email",
           "tool": "searchEmails",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Claude Post).",
-          "evidence": "searchEmails"
+          "detail": "Tool name is also used by another server (Claude Post). searchEmails"
         },
         {
           "server": "Gitlab",
           "tool": "create_branch",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "create_branch"
+          "detail": "Tool name is also used by another server (Github). create_branch"
         },
         {
           "server": "Gitlab",
           "tool": "create_issue",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "create_issue"
+          "detail": "Tool name is also used by another server (Github). create_issue"
         },
         {
           "server": "Gitlab",
           "tool": "create_or_update_file",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "create_or_update_file"
+          "detail": "Tool name is also used by another server (Github). create_or_update_file"
         },
         {
           "server": "Gitlab",
           "tool": "create_repository",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "create_repository"
+          "detail": "Tool name is also used by another server (Github). create_repository"
         },
         {
           "server": "Gitlab",
           "tool": "fork_repository",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "fork_repository"
+          "detail": "Tool name is also used by another server (Github). fork_repository"
         },
         {
           "server": "Gitlab",
           "tool": "get_file_contents",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "get_file_contents"
+          "detail": "Tool name is also used by another server (Github). get_file_contents"
         },
         {
           "server": "Gitlab",
           "tool": "push_files",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "push_files"
+          "detail": "Tool name is also used by another server (Github). push_files"
         },
         {
           "server": "Gitlab",
           "tool": "search_repositories",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (Github).",
-          "evidence": "search_repositories"
+          "detail": "Tool name is also used by another server (Github). search_repositories"
         },
         {
           "server": "GoogleDrive",
           "tool": "search",
-          "rule": "FT-D002",
+          "labels": "FT-D002",
           "severity": "medium",
-          "message": "Tool name is also used by another server (12306-mcp, DumplingAI).",
-          "evidence": "search"
+          "detail": "Tool name is also used by another server (12306-mcp, DumplingAI). search"
         }
       ]
     }

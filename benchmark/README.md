@@ -20,10 +20,47 @@ them.
 | Genuine tools wrongly flagged, each server scanned alone | **0.5%** (2/362; 95% CI 0.1% to 2.0%) |
 | Genuine tools wrongly flagged, all 45 servers scanned together | **11.9%** (43/362; 95% CI 8.9% to 15.6%) |
 
-All four count findings of severity `medium` and above. Full tables, including
-the `high` threshold, per-goal and per-rule breakdowns:
-[results/mcptox-blind.md](results/mcptox-blind.md). Machine-readable:
-[results/mcptox-blind.json](results/mcptox-blind.json).
+All four count findings of severity `medium` and above. Full tables with all
+three thresholds, per-goal and per-rule breakdowns:
+[results/mcptox-foretaster.md](results/mcptox-foretaster.md). Machine-readable:
+[results/mcptox-foretaster.json](results/mcptox-foretaster.json).
+
+## Comparison with Cisco MCP Scanner
+
+[Cisco MCP Scanner](https://github.com/cisco-ai-defense/mcp-scanner) 4.8.7 was
+run on the same corpus through its own command line, in its offline mode
+(`--analyzers yara static --tools`). Counting any finding at all:
+
+| Question | Foretaster 0.0.1 | Cisco MCP Scanner 4.8.7, YARA only |
+|---|---|---|
+| Poisoned tool scanned alone: flagged | 36.9% (179/485) | 20.4% (99/485) |
+| Poisoned tool scanned beside the server it targets: flagged | 94.8% (460/485) | 20.4% (99/485) |
+| Genuine tools wrongly flagged, each server alone | 0.5% (2/362) | 1.1% (4/362) |
+| Genuine tools wrongly flagged, all 45 servers together | 11.9% (43/362) | 1.1% (4/362) |
+
+Full table with confidence intervals:
+[results/mcptox-comparison.md](results/mcptox-comparison.md).
+
+Read this comparison with four things in mind:
+
+- **It is one configuration of the Cisco scanner, and not its strongest.** The
+  product has three engines: YARA rules, an LLM analyzer and the Cisco AI
+  Defense cloud API. Only the first runs without keys, and only that one was
+  measured. The LLM analyzer is designed for exactly the kind of prose MCPTox
+  contains and would very likely score higher. The fair statement is: among
+  free, offline, pattern-based modes, this is how the two compare.
+- **At the `high` threshold the two are level when a tool is scanned alone**:
+  20.0% for Foretaster against 20.4%. Foretaster's lead in that scenario comes
+  from findings it grades `medium`.
+- **The 94.8% depends on context the Cisco offline mode is not given.** It takes
+  one flat tool list and judges each tool by itself, so it has no way to notice
+  that a tool describes another server's tool.
+- **Foretaster is noisier when many servers are scanned together**, 11.9%
+  against 1.1%, because of FT-D002.
+
+Other scanners were not run. Snyk Agent Scan sends tool descriptions to a
+hosted API and needs an account token, which rules it out of an offline,
+reproducible run.
 
 ### How to read these numbers
 
@@ -52,9 +89,6 @@ are factually correct, nobody connects 45 servers at once, and the rule is
 noisy all the same. At the `high` threshold the figure is 0.3% (1/362) in both
 settings.
 
-**No other scanner has been run yet.** Until one is, these numbers say how
-Foretaster does, not whether it does better than anything else.
-
 ## Method
 
 - **Detection, two scenarios.** `alone`: only the poisoned tool is scanned.
@@ -63,8 +97,12 @@ Foretaster does, not whether it does better than anything else.
   names the poisoned tool itself.
 - **False positives, two scenarios.** Each real server scanned `alone`, and all
   of them scanned `together`. Any finding on a genuine tool counts as false.
-- **Two thresholds.** `medium` and above (shown to a reviewer as a warning) and
-  `high` and above (fails a CI run by default).
+- **Three thresholds.** `low` and above (the scanner said anything at all),
+  `medium` and above (shown to a reviewer as a warning) and `high` and above
+  (fails a CI run by default). Scanners grade severity differently, so no
+  single threshold is the fair one.
+- **Other scanners** are driven through their own published command line by an
+  adapter in `scanners/`, and receive exactly the same tool definitions.
 - **Confidence intervals** are 95% Wilson score intervals.
 - **Pinned data.** The corpus is downloaded at a fixed commit and verified by
   SHA-256 rather than copied into this repository.
@@ -74,7 +112,7 @@ Foretaster does, not whether it does better than anything else.
 Tuning rules on a corpus and then reporting the score on the same corpus proves
 nothing. Three safeguards:
 
-1. **The first run is frozen.** `results/mcptox-blind.*` was produced before any
+1. **The first run is frozen.** `results/mcptox-foretaster-blind.*` was produced before any
    rule was changed in response to MCPTox, and stays in the repository as the
    reference point.
 2. **Dev and test splits.** The 45 servers are divided in two by a hash of the
@@ -105,8 +143,22 @@ uv run python -m benchmark run mcptox
 ```
 
 The first run downloads about 21 MB into `benchmark/.cache/`. Results are
-written to `benchmark/results/`. Pass `--label NAME` to keep a run under its own
-file name.
+written to `benchmark/results/`.
+
+To measure the Cisco scanner, install it in its own environment and point the
+benchmark at the executable:
+
+```bash
+uv venv cisco-venv && uv pip install --python cisco-venv/bin/python cisco-ai-mcp-scanner==4.8.7
+```
+
+```bash
+uv run python -m benchmark run mcptox --scanner cisco-yara --cisco-bin cisco-venv/bin/mcp-scanner
+```
+
+```bash
+uv run python -m benchmark compare benchmark/results/mcptox-foretaster.json benchmark/results/mcptox-cisco-yara.json --output benchmark/results/mcptox-comparison.md
+```
 
 ## Attribution
 

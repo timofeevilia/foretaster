@@ -14,8 +14,8 @@ swallows them.
 
 > **Status: pre-alpha.** The scanner core is feature-complete: 19 rules, four
 > report formats, rug-pull detection. A first measurement on an independent
-> corpus is published [below](#benchmark); no other scanner has been compared
-> yet. See the [roadmap](#roadmap).
+> corpus, next to one other scanner, is published [below](#benchmark). See the
+> [roadmap](#roadmap).
 
 ## Why
 
@@ -255,21 +255,26 @@ Known limits:
 ## Benchmark
 
 Measured on [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark), a
-published corpus of 485 poisoned tool definitions built on 45 real MCP servers.
-Foretaster's rules were not changed after seeing it.
+published corpus of 485 poisoned tool definitions built on 45 real MCP servers,
+next to [Cisco MCP Scanner](https://github.com/cisco-ai-defense/mcp-scanner) in
+its offline mode. Foretaster's rules were not changed after seeing the corpus.
 
-| Question | Foretaster 0.0.1 |
-|---|---|
-| Poisoned tool scanned alone: flagged | 36.9% (179/485) |
-| Poisoned tool scanned beside the server it targets: flagged | 94.8% (460/485) |
-| Genuine tools wrongly flagged, each server scanned alone | 0.5% (2/362) |
-| Genuine tools wrongly flagged, all 45 servers scanned together | 11.9% (43/362) |
+| Question | Foretaster 0.0.1 | Cisco MCP Scanner 4.8.7, YARA only |
+|---|---|---|
+| Poisoned tool scanned alone: flagged | 36.9% (179/485) | 20.4% (99/485) |
+| Poisoned tool scanned beside the server it targets: flagged | 94.8% (460/485) | 20.4% (99/485) |
+| Genuine tools wrongly flagged, each server alone | 0.5% (2/362) | 1.1% (4/362) |
+| Genuine tools wrongly flagged, all 45 servers together | 11.9% (43/362) | 1.1% (4/362) |
 
-The gap between the first two rows is the point: most of these attacks are
-polite prose that hijacks another server's tool, and they are visible only when
-the scanner sees both servers. Scan the whole agent configuration, not one
-server at a time. The last row comes almost entirely from one rule, FT-D002,
-reporting genuine name clashes among 45 servers.
+Three things this table does not say. The Cisco scanner was run in its free
+offline configuration only; its LLM and cloud analyzers were not measured and
+would likely do better. Foretaster's 94.8% comes from seeing both servers at
+once, on a corpus whose attacks happen to name the tool they hijack. And
+Foretaster is the noisier of the two when many servers are scanned together.
+
+The practical lesson holds either way: most of these attacks are polite prose
+that hijacks another server's tool, so scan the whole agent configuration, not
+one server at a time.
 
 Method, caveats and full tables: [benchmark/README.md](benchmark/README.md).
 
@@ -303,7 +308,7 @@ below 90% fails the build.
 | Stage | Deliverable | State |
 |---|---|---|
 | 1 | Scanner core: config discovery, rule engine, 19 rules, JSON / SARIF / HTML reports, rug-pull detection | done |
-| 2 | Benchmark: Foretaster and other scanners measured on independent corpora | in progress: first corpus measured, other scanners not yet |
+| 2 | Benchmark: Foretaster and other scanners measured on independent corpora | in progress: one corpus and one other scanner measured |
 | 3 | Project site: documentation, benchmark charts, in-browser config check | planned |
 | 4 | GitHub Action, PyPI release, optional LLM layer | planned |
 | 5 | Honeypot for attacks on AI infrastructure, feeding new rules | planned |
