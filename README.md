@@ -100,7 +100,7 @@ uv run foretaster scan --tools examples/poisoned-tools.json
 ```text
 HIGH FT-T001 Tool text gives instructions to the model
   examples/poisoned-tools.json (server 'handy-math', tool 'add')
-  The tool description contains a fake system marker; a mandatory step imposed on the model; a directive addressed to the model.
+  The tool description contains a fake system marker; a mandatory step imposed on the model.
   ...
 Scanned 0 configuration file(s), 1 server(s), 3 tool(s). Findings: 3 high, 2 medium.
 ```
@@ -214,12 +214,12 @@ schemas, server instructions):
 
 | ID | Severity | Finds | OWASP MCP Top 10 |
 |---|---|---|---|
-| FT-T001 | medium–high | Instructions aimed at the model: overriding earlier instructions, fake system markers, steps imposed before other tools | MCP03, MCP06 |
+| FT-T001 | medium–high | Instructions aimed at the model: overriding earlier instructions or the user's request, fake system markers, steps imposed before other tools, claims of priority over the user, threats of failure | MCP03, MCP06 |
 | FT-T002 | medium–critical | Invisible characters: Unicode tags (decoded and shown), bidirectional controls, control characters, zero-width characters | MCP03 |
 | FT-T003 | medium–high | References to credential files such as `~/.ssh/id_rsa`, `.aws/credentials` or `mcp.json` | MCP03, MCP01 |
 | FT-T004 | high | Orders to hide an action from the user | MCP03, MCP06 |
 | FT-T005 | medium–high | Parameters built to carry stolen data: catch-all parameters the description tells the model to fill, or names such as `sidenote` and `system_prompt` | MCP03, MCP10 |
-| FT-T006 | medium–high | Tool shadowing: text that names another server's tool or sets rules for tools in general | MCP03, MCP06 |
+| FT-T006 | medium–high | Tool shadowing: text that names another server's tool, gives orders about a tool its own server does not provide, dictates a parameter the tool does not have, or sets rules for tools in general | MCP03, MCP06 |
 | FT-T007 | medium–high | Base64 or hex blocks that decode to readable text (decoded and shown), and runs of escaped character codes | MCP03 |
 | FT-T008 | low–medium | Text that is unusually long or padded with blank space to push content out of view | MCP03 |
 
@@ -233,7 +233,7 @@ Rules about change over time and about combinations:
 | ID | Severity | Finds | OWASP MCP Top 10 |
 |---|---|---|---|
 | FT-D001 | low–high | Tool definitions or server instructions that differ from the recorded baseline (rug pull); tools added or removed since | MCP03, MCP04 |
-| FT-D002 | medium | The same tool name, ignoring case and separators, advertised by two servers | MCP03, MCP09 |
+| FT-D002 | low | The same tool name, ignoring case and separators, advertised by two servers | MCP03, MCP09 |
 | FT-X001 | medium | A network server that listed its tools to the scanner although no credential was sent (`--connect` only) | MCP07 |
 | FT-X002 | medium | The "lethal trifecta": servers of one agent that together read private data, take in untrusted content and can send data out | MCP10, MCP02 |
 
@@ -257,24 +257,25 @@ Known limits:
 Measured on [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark), a
 published corpus of 485 poisoned tool definitions built on 45 real MCP servers,
 next to [Cisco MCP Scanner](https://github.com/cisco-ai-defense/mcp-scanner) in
-its offline mode. Foretaster's rules were not changed after seeing the corpus.
+its offline mode. Figures are from the held-out test split (178 poisoned and
+160 genuine tools), counting findings of severity `medium` and above.
 
-| Question | Foretaster 0.0.1 | Cisco MCP Scanner 4.8.7, YARA only |
-|---|---|---|
-| Poisoned tool scanned alone: flagged | 36.9% (179/485) | 20.4% (99/485) |
-| Poisoned tool scanned beside the server it targets: flagged | 94.8% (460/485) | 20.4% (99/485) |
-| Genuine tools wrongly flagged, each server alone | 0.5% (2/362) | 1.1% (4/362) |
-| Genuine tools wrongly flagged, all 45 servers together | 11.9% (43/362) | 1.1% (4/362) |
+| Question | Foretaster 0.0.1, before tuning | Foretaster 0.1.0 | Cisco MCP Scanner 4.8.7, YARA only |
+|---|---|---|---|
+| Poisoned tool scanned alone: flagged | 39.3% (70/178) | 93.8% (167/178) | 26.4% (47/178) |
+| Poisoned tool scanned beside the server it targets: flagged | 89.9% (160/178) | 96.6% (172/178) | 26.4% (47/178) |
+| Genuine tools wrongly flagged, each server alone | 0.6% (1/160) | 0.6% (1/160) | 0.6% (1/160) |
+| Genuine tools wrongly flagged, all servers together | 13.1% (21/160) | 0.6% (1/160) | 0.6% (1/160) |
 
-Three things this table does not say. The Cisco scanner was run in its free
-offline configuration only; its LLM and cloud analyzers were not measured and
-would likely do better. Foretaster's 94.8% comes from seeing both servers at
-once, on a corpus whose attacks happen to name the tool they hijack. And
-Foretaster is the noisier of the two when many servers are scanned together.
+What this table does not say:
 
-The practical lesson holds either way: most of these attacks are polite prose
-that hijacks another server's tool, so scan the whole agent configuration, not
-one server at a time.
+- Foretaster's rules were improved on the other half of this corpus. The test
+  split shows they carry over to unseen servers, not to attacks written in
+  another style; no second corpus has been run.
+- The Cisco scanner was run in its free offline configuration only. Its LLM and
+  cloud analyzers were not measured and would likely do better.
+- Most of Foretaster's detections are graded `medium`. At `high`, which fails
+  CI by default, it flags 52.2% of poisoned tools scanned alone.
 
 Method, caveats and full tables: [benchmark/README.md](benchmark/README.md).
 
@@ -308,7 +309,7 @@ below 90% fails the build.
 | Stage | Deliverable | State |
 |---|---|---|
 | 1 | Scanner core: config discovery, rule engine, 19 rules, JSON / SARIF / HTML reports, rug-pull detection | done |
-| 2 | Benchmark: Foretaster and other scanners measured on independent corpora | in progress: one corpus and one other scanner measured |
+| 2 | Benchmark: Foretaster and other scanners measured on independent corpora | in progress: one corpus and one other scanner measured; a second corpus is next |
 | 3 | Project site: documentation, benchmark charts, in-browser config check | planned |
 | 4 | GitHub Action, PyPI release, optional LLM layer | planned |
 | 5 | Honeypot for attacks on AI infrastructure, feeding new rules | planned |

@@ -83,7 +83,7 @@ class ToolNameCollision(Rule):
     meta = RuleMeta(
         id="FT-D002",
         title="Two servers advertise a tool with the same name",
-        severity=Severity.MEDIUM,
+        severity=Severity.LOW,
         description=(
             "Several connected servers offer a tool under the same name, or names that "
             "differ only in case and separators. The model can call the wrong one, and a "

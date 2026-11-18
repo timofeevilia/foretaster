@@ -117,8 +117,8 @@ def test_same_tool_name_on_two_servers() -> None:
     )
     findings = list(ToolNameCollision().check(ScanTarget((), (one, two))))
     assert [(f.server, f.tool, f.severity) for f in findings] == [
-        ("mail", "send_email", MEDIUM),
-        ("evil", "Send-Email", MEDIUM),
+        ("mail", "send_email", LOW),
+        ("evil", "Send-Email", LOW),
     ]
     assert "(evil)" in findings[0].message
     assert findings[1].location.pointer == "/tools/0/name"

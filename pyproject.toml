@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "foretaster"
-version = "0.0.1"
+version = "0.1.0"
 description = "Security scanner for AI agent configurations and MCP servers: finds poisoned tools before your agent swallows them."
 readme = "README.md"
 requires-python = ">=3.11"
