@@ -2,6 +2,8 @@
 
 from foretaster.rules.base import Rule, RuleMeta, ScanTarget
 from foretaster.rules.cleartext import CleartextTransport
+from foretaster.rules.combos import LethalTrifecta, OpenRemoteServer
+from foretaster.rules.drift import ChangedSinceBaseline, ToolNameCollision
 from foretaster.rules.filesystem import BroadFilesystemAccess
 from foretaster.rules.parse_problems import ParseProblems
 from foretaster.rules.secrets import PlaintextSecret
@@ -30,6 +32,10 @@ ALL_RULES: tuple[type[Rule], ...] = (
     ToolShadowing,
     EncodedPayload,
     AbnormalLength,
+    ChangedSinceBaseline,
+    ToolNameCollision,
+    OpenRemoteServer,
+    LethalTrifecta,
 )
 
 __all__ = ["ALL_RULES", "Rule", "RuleMeta", "ScanTarget"]

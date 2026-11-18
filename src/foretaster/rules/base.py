@@ -3,7 +3,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import ClassVar, NamedTuple
+from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar, NamedTuple
 
 from foretaster.models import (
     AgentConfig,
@@ -16,6 +17,9 @@ from foretaster.models import (
 )
 from foretaster.redact import scrub
 from foretaster.textscan import printable, schema_texts
+
+if TYPE_CHECKING:
+    from foretaster.baseline import Baseline
 
 # Verified against the OWASP MCP Top 10 project repository (2025 list, beta).
 OWASP_MCP = {
@@ -42,13 +46,24 @@ class RuleMeta:
     references: tuple[str, ...] = ()
 
 
+class TextItem(NamedTuple):
+    """A piece of untrusted text and where it came from."""
+
+    inventory: ServerInventory
+    tool: ToolDefinition | None
+    pointer: str
+    label: str
+    text: str
+
+
 class ScanTarget(NamedTuple):
     """Everything a scan knows about. Rules must treat it as read-only."""
 
     configs: tuple[AgentConfig, ...]
     inventories: tuple[ServerInventory, ...] = ()
+    baseline: "Baseline | None" = None
 
-    def texts(self) -> Iterator["TextItem"]:
+    def texts(self) -> Iterator[TextItem]:
         """Yield every piece of server-supplied text that a model would read."""
         for inventory in self.inventories:
             base = inventory.origin.pointer
@@ -81,22 +96,43 @@ class ScanTarget(NamedTuple):
                 yield config, server
 
 
-class TextItem(NamedTuple):
-    """A piece of untrusted text and where it came from."""
-
-    inventory: ServerInventory
-    tool: ToolDefinition | None
-    pointer: str
-    label: str
-    text: str
-
-
 class Rule(ABC):
     meta: ClassVar[RuleMeta]
 
     @abstractmethod
     def check(self, target: ScanTarget) -> Iterator[Finding]:
         """Yield a finding for every violation in ``target``."""
+
+    def make(
+        self,
+        path: Path,
+        message: str,
+        *,
+        pointer: str = "",
+        line: int | None = None,
+        server: str | None = None,
+        tool: str | None = None,
+        evidence: str | None = None,
+        severity: Severity | None = None,
+    ) -> Finding:
+        """Build a finding carrying this rule's metadata.
+
+        Message and evidence may quote configuration or server text, so both
+        are escaped to visible characters and scrubbed of recognisable
+        credentials here. A rule cannot leak either by accident.
+        """
+        return Finding(
+            rule_id=self.meta.id,
+            title=self.meta.title,
+            severity=severity or self.meta.severity,
+            message=scrub(printable(message)),
+            location=Location(path=path, pointer=pointer, line=line),
+            server=server,
+            tool=tool,
+            evidence=scrub(printable(evidence)) if evidence else None,
+            remediation=self.meta.remediation,
+            references=self.meta.references,
+        )
 
     def finding(
         self,
@@ -108,25 +144,17 @@ class Rule(ABC):
         evidence: str | None = None,
         severity: Severity | None = None,
     ) -> Finding:
-        """Build a finding carrying this rule's metadata.
-
-        Message and evidence are scrubbed of recognisable credentials here, so
-        a rule that quotes configuration text cannot leak them by accident.
-        """
+        """Build a finding about a configuration file or one of its servers."""
         if pointer is None:
             pointer = server.pointer if server else ""
-        return Finding(
-            rule_id=self.meta.id,
-            title=self.meta.title,
-            severity=severity or self.meta.severity,
-            message=scrub(message),
-            location=Location(
-                path=config.path, pointer=pointer, line=server.line if server else None
-            ),
+        return self.make(
+            config.path,
+            message,
+            pointer=pointer,
+            line=server.line if server else None,
             server=server.name if server else None,
-            evidence=scrub(evidence) if evidence else None,
-            remediation=self.meta.remediation,
-            references=self.meta.references,
+            evidence=evidence,
+            severity=severity,
         )
 
     def text_finding(
@@ -137,21 +165,15 @@ class Rule(ABC):
         evidence: str | None = None,
         severity: Severity | None = None,
     ) -> Finding:
-        """Build a finding about server-supplied text.
-
-        The text is attacker-controlled, so non-printable characters are
-        escaped before anything derived from it reaches a report.
-        """
+        """Build a finding about something a server advertises."""
         origin = item.inventory.origin
-        return Finding(
-            rule_id=self.meta.id,
-            title=self.meta.title,
-            severity=severity or self.meta.severity,
-            message=scrub(printable(message)),
-            location=Location(path=origin.path, pointer=item.pointer, line=origin.line),
+        return self.make(
+            origin.path,
+            message,
+            pointer=item.pointer,
+            line=origin.line,
             server=item.inventory.server,
             tool=item.tool.name if item.tool else None,
-            evidence=scrub(printable(evidence)) if evidence else None,
-            remediation=self.meta.remediation,
-            references=self.meta.references,
+            evidence=evidence,
+            severity=severity,
         )

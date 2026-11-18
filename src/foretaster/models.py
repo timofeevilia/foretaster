@@ -125,6 +125,8 @@ class ServerInventory(_Model):
     """The config entry or manifest file this inventory was obtained from."""
     instructions: str | None = None
     tools: tuple[ToolDefinition, ...] = ()
+    open_remote: bool = False
+    """True when a network server listed its tools to a client that sent no credentials."""
 
 
 class Finding(_Model):
