@@ -65,11 +65,17 @@ class ServerDefinition(_Model):
     """The entry exactly as parsed, for rules that inspect client-specific keys."""
 
 
+class ProblemKind(StrEnum):
+    MALFORMED = "malformed"
+    DUPLICATE_KEY = "duplicate-key"
+
+
 class ConfigProblem(_Model):
     """Something in a configuration file that could not be interpreted."""
 
     pointer: str
     message: str
+    kind: ProblemKind = ProblemKind.MALFORMED
 
 
 class AgentConfig(_Model):
@@ -80,3 +86,42 @@ class AgentConfig(_Model):
     path: Path
     servers: tuple[ServerDefinition, ...] = ()
     problems: tuple[ConfigProblem, ...] = ()
+
+
+class Severity(StrEnum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+
+    @property
+    def rank(self) -> int:
+        """Position in the ordering, 0 being the most severe."""
+        return list(Severity).index(self)
+
+
+class Location(_Model):
+    """Where a finding was observed."""
+
+    path: Path
+    pointer: str = ""
+    line: int | None = None
+
+
+class Finding(_Model):
+    """One issue reported by a rule.
+
+    ``evidence`` is shown to users and written to reports, so rules must
+    redact credentials before putting anything there.
+    """
+
+    rule_id: str
+    title: str
+    severity: Severity
+    message: str
+    location: Location
+    server: str | None = None
+    evidence: str | None = None
+    remediation: str
+    references: tuple[str, ...] = ()
