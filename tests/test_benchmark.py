@@ -9,8 +9,9 @@ import pytest
 from benchmark import __main__ as cli
 from benchmark.cases import SPLITS, CleanServer, PoisonedTool, Suite, split_of
 from benchmark.metrics import Rate
-from benchmark.report import render_markdown
-from benchmark.runner import evaluate
+from benchmark.report import render_comparison, render_markdown
+from benchmark.runner import evaluate as run_evaluation
+from benchmark.scanners import CiscoYaraScanner, ForetasterScanner
 from benchmark.suites import LOADERS, mcptox
 
 PROMPT = """You are a helpful assistant with access to these tools:
@@ -79,6 +80,10 @@ def suite() -> Suite:
     )
 
 
+def evaluate(target: Suite) -> dict[str, Any]:
+    return run_evaluation(target, ForetasterScanner())
+
+
 def test_wilson_interval() -> None:
     assert Rate(0, 0).value == 0.0
     assert Rate(0, 0).interval == (0.0, 0.0)
@@ -114,7 +119,7 @@ def test_evaluate_counts() -> None:
     assert alone["rates"]["medium"]["all"]["hits"] == 1
     assert beside["rates"]["medium"]["all"]["hits"] == 2
     assert beside["rates"]["medium"]["all"]["total"] == 4
-    assert beside["rules"]["FT-T006"] == 1
+    assert beside["labels"]["FT-T006"] == 1
     assert {entry["case"] for entry in beside["missed"]} == {"c3", "c4"}
     assert beside["by_category"]["Other"]["hits"] == 0
     assert beside["by_technique"]["T2"] == alone["by_technique"]["T2"]
@@ -122,9 +127,10 @@ def test_evaluate_counts() -> None:
     alone_fp = result["false_positives"]["alone"]
     together_fp = result["false_positives"]["together"]
     assert alone_fp["rates"]["medium"]["all"]["hits"] == 1
-    assert alone_fp["rules"] == {"FT-T001": 1}
+    assert alone_fp["labels"] == {"FT-T001": 1}
+    assert set(alone_fp["rates"]) == {"low", "medium", "high"}
     assert together_fp["rates"]["medium"]["all"]["hits"] == 3
-    assert together_fp["rules"] == {"FT-D002": 2, "FT-T001": 1}
+    assert together_fp["labels"] == {"FT-D002": 2, "FT-T001": 1}
 
 
 def test_test_split_text_is_withheld() -> None:
@@ -138,11 +144,11 @@ def test_test_split_text_is_withheld() -> None:
 
 
 def test_evaluate_fails_loudly_when_a_rule_crashes(monkeypatch: pytest.MonkeyPatch) -> None:
-    from benchmark import runner
+    from benchmark.scanners import foretaster as adapter
     from foretaster.engine import RuleError, ScanResult
 
     monkeypatch.setattr(
-        runner, "run_rules", lambda target: ScanResult((), (RuleError("FT-X", "boom"),))
+        adapter, "run_rules", lambda target: ScanResult((), (RuleError("FT-X", "boom"),))
     )
     with pytest.raises(RuntimeError, match="rule crashed"):
         evaluate(suite())
@@ -157,6 +163,20 @@ def test_markdown_report() -> None:
     assert "### All real servers scanned together" in page
     assert "| Credential Leakage | 100.0% (1/1; 95% CI" in page
     assert "| FT-D002 | 0 | 0 | 0 | 2 |" in page
+    assert "- Scanner note: Deterministic rules only" in page
+
+
+def test_comparison_report() -> None:
+    ours = evaluate(suite())
+    theirs = json.loads(json.dumps(ours))
+    theirs["scanner"] = {"name": "other", "version": "9", "notes": ["Different engine."]}
+    page = render_comparison([ours, theirs])
+    assert page.startswith("# Scanner comparison: demo")
+    assert "| Severity counted | foretaster" in page
+    assert "| other 9 |" in page
+    assert "- **other 9**: Different engine." in page
+    assert page.count("### ") == 4
+    assert "| `low` and above | 25.0% (1/4;" in page
 
 
 def test_parse_clean_tools() -> None:
@@ -238,15 +258,93 @@ def test_command_line_writes_results(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setitem(LOADERS, "mcptox", lambda cache_dir: suite())
-    monkeypatch.setattr(
-        "sys.argv",
-        ["benchmark", "run", "mcptox", "--output-dir", str(tmp_path), "--label", "blind"],
-    )
+    monkeypatch.setattr("sys.argv", ["benchmark", "run", "mcptox", "--output-dir", str(tmp_path)])
     cli.main()
 
     output = capsys.readouterr().out
     assert "detection (beside_target) >= medium: 50.0%" in output
     assert "false positives (together) >= medium: 60.0%" in output
-    saved = json.loads((tmp_path / "mcptox-blind.json").read_text())
-    assert saved["scanner"]["name"] == "foretaster"
-    assert (tmp_path / "mcptox-blind.md").read_text().startswith("# Benchmark results")
+    saved = tmp_path / "mcptox-foretaster.json"
+    assert json.loads(saved.read_text())["scanner"]["name"] == "foretaster"
+    assert (tmp_path / "mcptox-foretaster.md").read_text().startswith("# Benchmark results")
+
+    comparison = tmp_path / "comparison.md"
+    monkeypatch.setattr(
+        "sys.argv", ["benchmark", "compare", str(saved), str(saved), "--output", str(comparison)]
+    )
+    cli.main()
+    assert comparison.read_text().startswith("# Scanner comparison")
+
+    monkeypatch.delenv("MCP_SCANNER_BIN", raising=False)
+    monkeypatch.setattr("sys.argv", ["benchmark", "run", "mcptox", "--scanner", "cisco-yara"])
+    with pytest.raises(SystemExit, match="--cisco-bin"):
+        cli.main()
+
+
+FAKE_SCANNER = """#!{python}
+import json, sys
+if sys.argv[1] == "-c":
+    print("9.9.9")
+    raise SystemExit
+tools = json.load(open(sys.argv[sys.argv.index("--tools") + 1]))["tools"]
+mode = {mode!r}
+results = []
+for tool in tools:
+    bad = "evil" in tool["description"]
+    results.append({{
+        "status": "failed" if mode == "fail" else "completed",
+        "tool_name": "wrong" if mode == "shuffle" else tool["name"],
+        "findings": {{"yara_analyzer": {{
+            "severity": "HIGH" if bad else "SAFE",
+            "threat_names": ["PROMPT INJECTION"] if bad else [],
+            "threat_summary": "found" if bad else "No threats detected",
+        }}}},
+    }})
+if mode == "short":
+    results = results[:-1]
+print("log line before the document")
+print(json.dumps({{"scan_results": results}}))
+"""
+
+
+def fake_cisco(tmp_path: Path, mode: str = "ok") -> Path:
+    import sys
+
+    directory = tmp_path / mode
+    directory.mkdir()
+    for name in ("mcp-scanner", "python"):
+        path = directory / name
+        path.write_text(FAKE_SCANNER.format(python=sys.executable, mode=mode))
+        path.chmod(0o755)
+    return directory / "mcp-scanner"
+
+
+def test_cisco_adapter_maps_verdicts_back_to_batches(tmp_path: Path) -> None:
+    scanner = CiscoYaraScanner(fake_cisco(tmp_path))
+    assert scanner.version == "9.9.9"
+    assert scanner.scan_many([]) == []
+    assert scanner.scan_many([{"empty": []}]) == [{}]
+
+    batches = [
+        {"a": [tool("same", "fine"), tool("x", "evil plan")]},
+        {"b": [tool("same", "evil too")], "c": [tool("y", "fine")]},
+    ]
+    first, second = scanner.scan_many(batches)
+    assert set(first) == {("a", "x")}
+    assert set(second) == {("b", "same")}
+    assert first["a", "x"].severity.value == "high"
+    assert first["a", "x"].labels == ("PROMPT INJECTION",)
+
+    result = run_evaluation(suite(), scanner)
+    assert result["scanner"]["version"] == "9.9.9"
+    assert result["detection"]["alone"] == result["detection"]["beside_target"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "message"),
+    [("short", "expected 1 verdicts, got 0"), ("shuffle", "order mismatch"), ("fail", "ended as")],
+)
+def test_cisco_adapter_rejects_inconsistent_output(tmp_path: Path, mode: str, message: str) -> None:
+    scanner = CiscoYaraScanner(fake_cisco(tmp_path, mode))
+    with pytest.raises(RuntimeError, match=message):
+        scanner.scan_many([{"a": [tool("x", "evil")]}])
