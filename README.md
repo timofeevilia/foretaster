@@ -12,9 +12,9 @@ poisoned. This tool does the same job for AI agents: it inspects the tools an
 agent is about to trust and reports the poisoned ones before the agent
 swallows them.
 
-> **Status: pre-alpha.** Configuration scanning and tool-description scanning
-> work. Rug-pull detection, SARIF and HTML reports are not built yet. See the
-> [roadmap](#roadmap).
+> **Status: pre-alpha.** The scanner core is feature-complete: 19 rules, four
+> report formats, rug-pull detection. It has not been measured against a
+> benchmark yet, so detection quality is unproven. See the [roadmap](#roadmap).
 
 ## Why
 
@@ -44,9 +44,9 @@ makes the description an attack surface:
 3. **Measured, not claimed.** Detection quality is reported against an open
    benchmark of deliberately vulnerable MCP servers, alongside other scanners.
 4. **Mapped to standards.** Findings reference the
-   [OWASP MCP Top 10](https://owasp.org/www-project-mcp-top-10/). A mapping to
-   the OWASP Top 10 for Agentic Applications and SARIF export for GitHub code
-   scanning are planned.
+   [OWASP MCP Top 10](https://owasp.org/www-project-mcp-top-10/), and reports
+   export to SARIF for GitHub code scanning. A mapping to the OWASP Top 10 for
+   Agentic Applications is planned.
 
 ## Installation
 
@@ -80,7 +80,7 @@ CRITICAL FT-C004 Server is started through a shell command
   Fix: Run the server binary directly with explicit arguments. Never pipe a download into an interpreter.
   OWASP MCP05:2025 Command Injection & Execution
   ...
-Scanned 1 configuration file(s), 5 server(s). Findings: 1 critical, 2 high, 3 medium.
+Scanned 1 configuration file(s), 5 server(s), 0 tool(s). Findings: 1 critical, 2 high, 3 medium.
 ```
 
 ### Scanning tool descriptions
@@ -122,6 +122,40 @@ sends `initialize` and `tools/list` and nothing else: no tool is ever called.
 A server that does not answer within `--timeout` seconds (default 30) is
 reported and makes the scan incomplete.
 
+### Detecting changed tools (rug pulls)
+
+A server can show harmless descriptions while you review it and replace them
+later. Record what you approved:
+
+```bash
+uv run foretaster baseline --tools examples/poisoned-tools.json
+```
+
+This writes `.foretaster-baseline.json`. It holds SHA-256 digests only, never
+the text, so it is safe to commit. Later scans compare against it:
+
+```bash
+uv run foretaster scan --tools examples/poisoned-tools.json --baseline .foretaster-baseline.json
+```
+
+A changed description or parameter list is reported as FT-D001 (high), a tool
+added since the baseline as medium. `baseline` accepts `--connect` too.
+
+### Reports
+
+| Format | Use |
+|---|---|
+| `console` | Reading in a terminal. The default. |
+| `json` | Processing by scripts. No timestamps, so equal inputs give byte-equal reports. |
+| `sarif` | [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning) and other SARIF 2.1.0 consumers. Findings appear in the repository's Security tab. |
+| `html` | Sharing with people. One self-contained file: no scripts, no network requests, and a Content Security Policy that forbids both. |
+
+```bash
+uv run foretaster scan --format html --output report.html
+```
+
+![HTML report with severity counters and a list of findings](docs/assets/html-report.png)
+
 ### Options
 
 | Option | Meaning |
@@ -129,7 +163,8 @@ reported and makes the scan incomplete.
 | `--tools FILE` | Scan a saved tool list. Repeatable. |
 | `--connect` | Ask the configured servers for their tools. Runs their commands. |
 | `--timeout SECONDS` | How long to wait for each server with `--connect`. |
-| `--format console\|json` | Report format. The JSON report has no timestamps, so equal inputs give byte-equal reports. |
+| `--baseline FILE` | Compare tool definitions with a recorded baseline. |
+| `--format console\|json\|sarif\|html` | Report format. |
 | `--output FILE` | Write the report to a file instead of the terminal. |
 | `--fail-on SEVERITY` | Lowest severity that makes the command fail: `critical`, `high` (default), `medium`, `low`, `info` or `never`. |
 | `--project-dir DIR` | Where to look for project-level configuration. |
@@ -138,8 +173,9 @@ Exit status: `0` clean, `1` findings at or above `--fail-on`, `2` the scan was
 incomplete (a file could not be parsed, a server did not answer or a rule
 crashed). An incomplete scan is never reported as clean.
 
-Other commands: `foretaster discover` lists configuration files and servers
-without scanning them, `foretaster rules` lists the rules.
+Other commands: `foretaster baseline` records tool definitions,
+`foretaster discover` lists configuration files and servers without scanning
+them, `foretaster rules` lists the rules.
 
 Without `--connect`, scanning only reads files. Credentials never reach a
 report: rules redact what they quote, and every finding is scrubbed again when
@@ -191,12 +227,14 @@ characters are decoded, zero-width characters removed and look-alike forms
 folded. Splitting `ignore` with an invisible character does not get a phrase
 past a rule.
 
-Planned for v0.1:
+Rules about change over time and about combinations:
 
-| Group | Checks |
-|---|---|
-| Change and conflict | tool description changed since baseline (rug pull), tool name collisions across servers |
-| Dangerous combinations | remote server without authentication; one agent holding private data access, untrusted input and an outbound channel at once |
+| ID | Severity | Finds | OWASP MCP Top 10 |
+|---|---|---|---|
+| FT-D001 | low–high | Tool definitions or server instructions that differ from the recorded baseline (rug pull); tools added or removed since | MCP03, MCP04 |
+| FT-D002 | medium | The same tool name, ignoring case and separators, advertised by two servers | MCP03, MCP09 |
+| FT-X001 | medium | A network server that listed its tools to the scanner although no credential was sent (`--connect` only) | MCP07 |
+| FT-X002 | medium | The "lethal trifecta": servers of one agent that together read private data, take in untrusted content and can send data out | MCP10, MCP02 |
 
 Known limits:
 
@@ -207,6 +245,9 @@ Known limits:
   innocent name. FT-C005 compares against a short built-in list of popular
   packages.
 - The thresholds of FT-T008 are provisional until the benchmark exists.
+- FT-X002 guesses what a tool can do from its name and description, or from the
+  package name when the tools are unknown. It is a prompt to look, not a proof.
+- A baseline identifies servers by name. Renaming a server makes it look new.
 - `--connect` over HTTP and SSE is tested against unreachable endpoints only;
   the stdio path is tested end to end.
 
@@ -239,7 +280,7 @@ below 90% fails the build.
 
 | Stage | Deliverable | State |
 |---|---|---|
-| 1 | Scanner core: config discovery, rule engine, 18 rules, JSON / SARIF / HTML reports | in progress |
+| 1 | Scanner core: config discovery, rule engine, 19 rules, JSON / SARIF / HTML reports, rug-pull detection | done |
 | 2 | Open benchmark: corpus of vulnerable MCP servers, results for Foretaster and other scanners | planned |
 | 3 | Project site: documentation, benchmark charts, in-browser config check | planned |
 | 4 | GitHub Action, PyPI release, optional LLM layer | planned |

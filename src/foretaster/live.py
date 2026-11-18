@@ -8,9 +8,11 @@ The exchange is limited to ``initialize`` and ``tools/list``. No tool is ever
 called.
 """
 
+import ipaddress
 import os
 from collections.abc import Sequence
 from typing import Any, NamedTuple
+from urllib.parse import urlsplit
 
 from foretaster.models import AgentConfig, Location, ServerDefinition, ServerInventory, Transport
 from foretaster.textscan import printable
@@ -65,11 +67,36 @@ def collect(configs: Sequence[AgentConfig], *, timeout: float = DEFAULT_TIMEOUT)
                 else:
                     origin = Location(path=config.path, pointer=server.pointer, line=server.line)
                     inventories.append(
-                        inventory_from_tools(server.name, origin, tools, instructions)
+                        inventory_from_tools(
+                            server.name,
+                            origin,
+                            tools,
+                            instructions,
+                            open_remote=_sent_no_credentials(server),
+                        )
                     )
         return LiveResult(tuple(inventories), tuple(failures))
 
     return anyio.run(run)
+
+
+def _sent_no_credentials(server: ServerDefinition) -> bool:
+    """True for a non-local network server that was contacted with no credential at all."""
+    if server.transport is Transport.STDIO or not server.url or server.headers:
+        return False
+    try:
+        parts = urlsplit(server.url)
+        host = parts.hostname or ""
+        if parts.username or parts.password or parts.query:
+            return False
+    except ValueError:
+        return False
+    if host == "localhost" or host.endswith(".localhost"):
+        return False
+    try:
+        return not ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return True
 
 
 async def _fetch(server: ServerDefinition) -> tuple[str | None, list[dict[str, Any]]]:

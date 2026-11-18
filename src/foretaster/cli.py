@@ -3,7 +3,7 @@
 import json
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NamedTuple
 
 import typer
 from rich.console import Console
@@ -11,6 +11,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from foretaster import __version__
+from foretaster.baseline import Baseline, build_baseline, dump_baseline, load_baseline
 from foretaster.config_loader import ConfigLoadError, load_config
 from foretaster.discovery import Candidate, DiscoveryResult, LoadFailure, discover
 from foretaster.engine import run_rules
@@ -18,6 +19,8 @@ from foretaster.live import DEFAULT_TIMEOUT, ConnectionFailure, ConnectUnavailab
 from foretaster.models import AgentConfig, Client, Scope, ServerInventory, Severity
 from foretaster.report import Report, build_report
 from foretaster.report.console import render_console
+from foretaster.report.html import render_html
+from foretaster.report.sarif import render_sarif
 from foretaster.rules import ALL_RULES, ScanTarget
 from foretaster.tool_manifest import load_tool_manifest
 
@@ -28,6 +31,8 @@ EXIT_INCOMPLETE = 2
 class OutputFormat(StrEnum):
     CONSOLE = "console"
     JSON = "json"
+    SARIF = "sarif"
+    HTML = "html"
 
 
 class FailOn(StrEnum):
@@ -202,6 +207,15 @@ def scan(
         float,
         typer.Option("--timeout", help="Seconds to wait for each server with --connect.", min=1),
     ] = DEFAULT_TIMEOUT,
+    baseline: Annotated[
+        Path | None,
+        typer.Option(
+            "--baseline",
+            help="Compare tool definitions with a file written by `foretaster baseline`.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
     output_format: Annotated[
         OutputFormat, typer.Option("--format", help="Report format.")
     ] = OutputFormat.CONSOLE,
@@ -219,6 +233,125 @@ def scan(
     Reads files only, unless --connect is given. Exit status is 0 when clean,
     1 when findings reach --fail-on, 2 when the scan was incomplete.
     """
+    gathered = _gather(paths, tools, project_dir, connect, timeout)
+    known: Baseline | None = None
+    if baseline:
+        try:
+            known = load_baseline(baseline)
+        except ConfigLoadError as exc:
+            gathered.failures.append(
+                LoadFailure(Candidate(Client.GENERIC, Scope.USER, baseline), exc.reason)
+            )
+    target = ScanTarget(tuple(gathered.configs), tuple(gathered.inventories), known)
+    report = build_report(
+        gathered.configs,
+        gathered.failures,
+        run_rules(target),
+        gathered.inventories,
+        gathered.unreachable,
+    )
+
+    if output_format is OutputFormat.CONSOLE:
+        if output:
+            with output.open("w", encoding="utf-8") as stream:
+                render_console(report, Console(file=stream, no_color=True, width=100))
+        else:
+            render_console(report, Console())
+    else:
+        if output_format is OutputFormat.JSON:
+            text = report.model_dump_json(indent=2) + "\n"
+        elif output_format is OutputFormat.SARIF:
+            text = render_sarif(report)
+        else:
+            text = render_html(report)
+        if output:
+            output.write_text(text, encoding="utf-8")
+        else:
+            typer.echo(text, nl=False)
+
+    raise typer.Exit(_exit_code(report, fail_on))
+
+
+@app.command(name="baseline")
+def baseline_command(
+    paths: Annotated[
+        list[Path] | None,
+        typer.Argument(
+            help="Configuration files whose servers to record. Used with --connect.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
+    tools: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--tools",
+            help="Saved tool list of a server to record. Repeatable.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
+    project_dir: Annotated[
+        Path,
+        typer.Option(
+            "--project-dir",
+            help="Directory to search for project-level configuration.",
+            file_okay=False,
+            exists=True,
+        ),
+    ] = Path("."),
+    connect: Annotated[
+        bool,
+        typer.Option(
+            "--connect",
+            help="Start or contact each configured server and record the tools it advertises. "
+            "This runs the commands in your configuration.",
+        ),
+    ] = False,
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", help="Seconds to wait for each server with --connect.", min=1),
+    ] = DEFAULT_TIMEOUT,
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Where to write the baseline.", dir_okay=False),
+    ] = Path(".foretaster-baseline.json"),
+) -> None:
+    """Record the tool definitions servers advertise now, for later comparison.
+
+    Review the tools first: a baseline says "this is what I approved". Only
+    digests are stored, so the file is safe to commit. Nothing is written if any
+    source could not be read, because a partial baseline would be misleading.
+    """
+    gathered = _gather(paths, tools, project_dir, connect, timeout)
+    problems = [f"{failure.candidate.path}: {failure.reason}" for failure in gathered.failures]
+    problems += [f"server {failure.server}: {failure.reason}" for failure in gathered.unreachable]
+    if not gathered.inventories and not problems:
+        problems.append("no tool definitions to record; pass --tools or --connect")
+    if problems:
+        for problem in problems:
+            typer.echo(f"Error: {problem}", err=True)
+        raise typer.Exit(EXIT_INCOMPLETE)
+    recorded = build_baseline(gathered.inventories)
+    output.write_text(dump_baseline(recorded), encoding="utf-8")
+    count = sum(len(server.tools) for server in recorded.servers.values())
+    typer.echo(f"Recorded {count} tool(s) of {len(recorded.servers)} server(s) in {output}")
+
+
+class _Gathered(NamedTuple):
+    configs: list[AgentConfig]
+    failures: list[LoadFailure]
+    inventories: list[ServerInventory]
+    unreachable: tuple[ConnectionFailure, ...]
+
+
+def _gather(
+    paths: list[Path] | None,
+    tools: list[Path] | None,
+    project_dir: Path,
+    connect: bool,
+    timeout: float,
+) -> _Gathered:
     configs, failures = _load(paths, project_dir, discover_all=not paths and not tools)
     inventories = _load_manifests(tools or [], failures)
     unreachable: tuple[ConnectionFailure, ...] = ()
@@ -230,22 +363,7 @@ def scan(
             raise typer.Exit(EXIT_INCOMPLETE) from exc
         inventories.extend(live.inventories)
         unreachable = live.failures
-    target = ScanTarget(tuple(configs), tuple(inventories))
-    report = build_report(configs, failures, run_rules(target), inventories, unreachable)
-
-    if output_format is OutputFormat.JSON:
-        text = report.model_dump_json(indent=2) + "\n"
-        if output:
-            output.write_text(text, encoding="utf-8")
-        else:
-            typer.echo(text, nl=False)
-    elif output:
-        with output.open("w", encoding="utf-8") as stream:
-            render_console(report, Console(file=stream, no_color=True, width=100))
-    else:
-        render_console(report, Console())
-
-    raise typer.Exit(_exit_code(report, fail_on))
+    return _Gathered(configs, failures, inventories, unreachable)
 
 
 @app.command(name="rules")

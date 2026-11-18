@@ -40,13 +40,19 @@ def load_tool_manifest(path: Path) -> list[ServerInventory]:
 
 
 def inventory_from_tools(
-    server: str, origin: Location, tools: list[dict[str, Any]], instructions: str | None
+    server: str,
+    origin: Location,
+    tools: list[dict[str, Any]],
+    instructions: str | None,
+    *,
+    open_remote: bool = False,
 ) -> ServerInventory:
     """Build an inventory from already-parsed ``tools/list`` entries."""
     return ServerInventory(
         server=server,
         origin=origin,
         instructions=instructions,
+        open_remote=open_remote,
         tools=tuple(_tool(origin.path, tool, index) for index, tool in enumerate(tools)),
     )
 
