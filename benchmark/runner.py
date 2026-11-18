@@ -39,6 +39,7 @@ from typing import Any
 from benchmark.cases import SPLITS, PoisonedTool, Suite, split_of
 from benchmark.metrics import Rate
 from benchmark.scanners import Flag, Scanner, Servers
+from benchmark.suites.wild import SUBJECT, CaseSuite
 from foretaster.models import Severity
 
 THRESHOLDS = (Severity.LOW, Severity.MEDIUM, Severity.HIGH)
@@ -167,5 +168,87 @@ def evaluate(suite: Suite, scanner: Scanner) -> dict[str, Any]:
         },
         "false_positives": {
             scenario: _false_positives(scanner, clean, scenario) for scenario in FP_SCENARIOS
+        },
+    }
+
+
+def evaluate_cases(suite: CaseSuite, scanner: Scanner) -> dict[str, Any]:
+    """Judge whole tool lists: is each malicious one flagged, is each benign one left alone?
+
+    The whole suite is held out, so no text from it is written to the result.
+    """
+    verdicts = scanner.scan_many([case.servers for case in suite.cases])
+    worst: list[Flag | None] = []
+    for case_verdicts in verdicts:
+        flags = [flag for (server, _), flag in case_verdicts.items() if server == SUBJECT]
+        worst.append(min(flags, key=lambda flag: flag.severity.rank) if flags else None)
+
+    def rates(malicious: bool, **only: str) -> dict[str, Any]:
+        chosen = [
+            flag
+            for case, flag in zip(suite.cases, worst, strict=True)
+            if case.malicious is malicious
+            and all(getattr(case, field) == value for field, value in only.items())
+        ]
+        return {
+            t.value: Rate(sum(_reaches(flag, t) for flag in chosen), len(chosen)).as_dict()
+            for t in THRESHOLDS
+        }
+
+    malicious = [case for case in suite.cases if case.malicious]
+    benign = [case for case in suite.cases if not case.malicious]
+    labels: Counter[str] = Counter()
+    for case, case_verdicts in zip(suite.cases, verdicts, strict=True):
+        if case.malicious:
+            seen = {
+                label
+                for (server, _), flag in case_verdicts.items()
+                if server == SUBJECT and _reaches(flag, BREAKDOWN)
+                for label in flag.labels
+            }
+            labels.update(seen)
+    return {
+        "schema_version": "2",
+        "kind": "cases",
+        "scanner": {"name": scanner.name, "version": scanner.version, "notes": list(scanner.notes)},
+        "suite": {
+            "name": suite.name,
+            "description": suite.description,
+            "notes": list(suite.notes),
+            "malicious_cases": len(malicious),
+            "benign_cases": len(benign),
+            "sources": [
+                {
+                    "name": source.name,
+                    "url": source.url,
+                    "revision": source.revision,
+                    "licence": source.licence,
+                    "malicious_cases": sum(c.source == source.name for c in malicious),
+                    "benign_cases": sum(c.source == source.name for c in benign),
+                }
+                for source in suite.sources
+            ],
+        },
+        "detection": {
+            "rates": rates(True),
+            "by_source": {s.name: rates(True, source=s.name) for s in suite.sources},
+            "by_category": {
+                category: rates(True, category=category)
+                for category in sorted({case.category for case in malicious})
+            },
+            "labels": dict(sorted(labels.items())),
+            "missed": sorted(
+                case.case_id
+                for case, flag in zip(suite.cases, worst, strict=True)
+                if case.malicious and not _reaches(flag, BREAKDOWN)
+            ),
+        },
+        "false_positives": {
+            "rates": rates(False),
+            "flagged": sorted(
+                case.case_id
+                for case, flag in zip(suite.cases, worst, strict=True)
+                if not case.malicious and _reaches(flag, BREAKDOWN)
+            ),
         },
     }

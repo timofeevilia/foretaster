@@ -56,8 +56,9 @@ to `low`.
 (93.2% and 93.8% alone), so the rules were not fitted to individual dev cases.
 But both splits come from the same generator and the same three templates. The
 test split shows the rules carry over to servers they had not seen; it does not
-show they carry over to attacks written in another style. That needs a second
-corpus, which has not been run.
+show they carry over to attacks written in another style. A second corpus was
+run to find out, and the answer is that they mostly do not: see
+[Results on a second corpus](#results-on-a-second-corpus).
 
 **Most of the gain is graded `medium`.** At the `high` threshold, which is what
 fails a CI run by default, detection of tools scanned alone is 52.2% (93/178)
@@ -98,6 +99,78 @@ Other scanners were not run. Snyk Agent Scan sends tool descriptions to a
 hosted API and needs an account token, which rules it out of an offline,
 reproducible run.
 
+## Results on a second corpus
+
+MCPTox comes from one generator and three templates. To see whether detection
+carries over to attacks written by other people, Foretaster 0.1.0 was run on 54
+tool lists from three unrelated sources. Nothing in this corpus was used to
+change a rule, before or after.
+
+| Source | What it is | Malicious | Benign |
+|---|---|---|---|
+| [mcp-guardbench](https://github.com/getmcpm/mcp-guardbench) (MIT) | Test cases for runtime guards; the `tools/list` ones, including benign lists written as false-positive traps | 10 | 7 |
+| [MCP-Poison-Bench](https://github.com/chirag-dewan/MCP-Poison-Bench) (MIT) | Payloads of a demonstration server, mostly a held-out set written to avoid the wording of well-known attacks | 33 | 1 |
+| [Invariant Labs mcp-injection-experiments](https://github.com/invariantlabs-ai/mcp-injection-experiments) (no licence stated) | The three original tool-poisoning demonstrations | 3 | 0 |
+
+A case is one whole tool list. It counts as flagged when the scanner raises a
+finding of severity `medium` or above on any tool in it.
+
+| Question | Foretaster 0.1.0 | Cisco MCP Scanner 4.8.7, YARA only |
+|---|---|---|
+| Malicious tool lists flagged | **32.6%** (15/46; 95% CI 20.9% to 47.0%) | 21.7% (10/46; 95% CI 12.3% to 35.6%) |
+| Benign tool lists wrongly flagged | **50.0%** (4/8; 95% CI 21.5% to 78.5%) | 25.0% (2/8; 95% CI 7.1% to 59.1%) |
+
+By source, malicious lists flagged:
+
+| Source | Foretaster 0.1.0 | Cisco MCP Scanner 4.8.7, YARA only |
+|---|---|---|
+| mcp-guardbench | 90.0% (9/10) | 40.0% (4/10) |
+| MCP-Poison-Bench | 9.1% (3/33) | 9.1% (3/33) |
+| mcp-injection-experiments | 100.0% (3/3) | 100.0% (3/3) |
+
+Full table with the list of missed cases:
+[results/wild-comparison.md](results/wild-comparison.md).
+
+### What this says
+
+**The 94% on MCPTox does not carry over.** On attacks by other authors
+Foretaster flags a third. The earlier caveat was not a formality.
+
+**The split is by style, not by luck.** Attacks that use recognisable devices
+are caught: fake system tags, invisible characters, references to credential
+files, orders to keep the user uninformed. That covers the classic
+demonstrations and nine of ten guardbench cases. MCP-Poison-Bench's held-out
+payloads were written specifically to carry the same intent without that
+vocabulary, and both scanners catch 3 of 33. Pattern matching finds the attacks
+whose wording somebody has already seen.
+
+**Half of the benign lists were flagged.** Four of the eight benign lists drew a
+finding: tools for SSH key management, for editing system prompts, for rotating
+TLS certificates, and a wallet with a non-custodial disclaimer. These lists were
+written to trap exactly this kind of scanner, since they legitimately mention
+keys, prompts and secrets, so eight cases say little about a typical server. On
+MCPTox's 362 genuine tools the rate was 0.3%. What the trap does show is that
+rules keyed on sensitive vocabulary cannot tell a tool that manages SSH keys
+from a tool that steals them.
+
+**The numbers are small.** With 46 and 8 cases the confidence intervals are
+wide, and the two scanners' intervals overlap. This corpus supports "about a
+third" and "clearly worse than on MCPTox". It does not support a ranking of the
+two scanners.
+
+**Seventeen further payloads were left out.** Two MCP-Poison-Bench attack
+classes show a clean description when tools are listed and inject only after a
+tool has been called. Nothing that reads tool lists can see them, Foretaster
+included. Rug-pull detection with a baseline addresses the case where the
+*description* later changes, not the case where the tool's *output* carries the
+injection.
+
+**What follows for the project.** Deterministic rules are worth having: they
+are free, fast, explainable and catch the attacks in circulation. They are not
+sufficient, and no amount of tuning on one corpus changes that. The intended
+answer is the optional LLM layer on the roadmap, to be measured on these same
+corpora.
+
 ## Method
 
 - **Detection, two scenarios.** `alone`: only the poisoned tool is scanned.
@@ -137,7 +210,11 @@ nothing. Three safeguards:
 
 ### Limits of this benchmark
 
-- One corpus, one family of attacks, English only.
+- Two corpora, one large and one small, English only.
+- The second corpus was assembled by this project from other people's material.
+  MCP-Poison-Bench payloads were read from source code and placed into tool
+  definitions the way its demonstration server places them, without running
+  that server. Invariant's demonstrations were read the same way.
 - MCPTox poisoned tools have a name and a description but no parameter schema,
   so rules about parameters (FT-T005) are not exercised.
 - The genuine tools are parsed back from MCPTox's rendered prompt text, which
@@ -157,6 +234,12 @@ uv run python -m benchmark run mcptox
 
 The first run downloads about 21 MB into `benchmark/.cache/`. Results are
 written to `benchmark/results/`.
+
+The second corpus is run the same way and needs about 60 small downloads:
+
+```bash
+uv run python -m benchmark run wild
+```
 
 To measure the Cisco scanner, install it in its own environment and point the
 benchmark at the executable:

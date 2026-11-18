@@ -5,10 +5,10 @@ import json
 import os
 from pathlib import Path
 
-from benchmark.report import render_comparison, render_markdown
-from benchmark.runner import evaluate
+from benchmark.report import render_case_comparison, render_comparison, render_markdown
+from benchmark.runner import evaluate, evaluate_cases
 from benchmark.scanners import CiscoYaraScanner, ForetasterScanner, Scanner
-from benchmark.suites import LOADERS
+from benchmark.suites import CASE_LOADERS, LOADERS
 
 ROOT = Path(__file__).parent
 SCANNERS = ("foretaster", "cisco-yara")
@@ -30,7 +30,7 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
 
     run = commands.add_parser("run", help="Run a suite with one scanner and write its results.")
-    run.add_argument("suite", choices=sorted(LOADERS))
+    run.add_argument("suite", choices=sorted({*LOADERS, *CASE_LOADERS}))
     run.add_argument("--scanner", choices=SCANNERS, default="foretaster")
     run.add_argument(
         "--cisco-bin",
@@ -49,14 +49,30 @@ def main() -> None:
     arguments = parser.parse_args()
     if arguments.command == "compare":
         results = [json.loads(path.read_text(encoding="utf-8")) for path in arguments.results]
-        arguments.output.write_text(render_comparison(results), encoding="utf-8")
+        render = render_case_comparison if results[0].get("kind") == "cases" else render_comparison
+        arguments.output.write_text(render(results), encoding="utf-8")
         print(f"wrote {arguments.output}")
         return
 
-    suite = LOADERS[arguments.suite](arguments.cache_dir)
-    result = evaluate(suite, _scanner(arguments.scanner, arguments.cisco_bin))
+    scanner = _scanner(arguments.scanner, arguments.cisco_bin)
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{arguments.suite}-{arguments.label or arguments.scanner}"
+    if arguments.suite in CASE_LOADERS:
+        result = evaluate_cases(CASE_LOADERS[arguments.suite](arguments.cache_dir), scanner)
+        (arguments.output_dir / f"{stem}.json").write_text(
+            json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        for threshold, rate in result["detection"]["rates"].items():
+            print(f"detection >= {threshold}: {rate['rate']:.1%} ({rate['hits']}/{rate['total']})")
+        for threshold, rate in result["false_positives"]["rates"].items():
+            print(
+                f"false positives >= {threshold}: {rate['rate']:.1%} "
+                f"({rate['hits']}/{rate['total']})"
+            )
+        return
+
+    suite = LOADERS[arguments.suite](arguments.cache_dir)
+    result = evaluate(suite, scanner)
     (arguments.output_dir / f"{stem}.json").write_text(
         json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
