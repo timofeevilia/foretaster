@@ -57,7 +57,7 @@ packages = ["src/foretaster"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "tests"]
+src = ["src", "tests", "."]
 
 [tool.ruff.lint]
 select = [
@@ -78,7 +78,7 @@ select = [
 [tool.mypy]
 strict = true
 python_version = "3.11"
-files = ["src", "tests"]
+files = ["src", "tests", "benchmark"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
