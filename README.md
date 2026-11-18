@@ -12,8 +12,9 @@ poisoned. This tool does the same job for AI agents: it inspects the tools an
 agent is about to trust and reports the poisoned ones before the agent
 swallows them.
 
-> **Status: pre-alpha.** The repository currently holds the project skeleton.
-> Nothing below marked *planned* works yet. See the [roadmap](#roadmap).
+> **Status: pre-alpha.** Configuration scanning works. Inspecting the tools of
+> a live MCP server, SARIF and HTML reports are not built yet. See the
+> [roadmap](#roadmap).
 
 ## Why
 
@@ -42,18 +43,10 @@ makes the description an attack surface:
    LLM-based layer for semantic checks is optional.
 3. **Measured, not claimed.** Detection quality is reported against an open
    benchmark of deliberately vulnerable MCP servers, alongside other scanners.
-4. **Mapped to standards.** Every finding references the OWASP MCP Top 10 and
-   the OWASP Top 10 for Agentic Applications, and reports export to SARIF for
-   GitHub code scanning.
-
-## Planned rule set (v0.1)
-
-| Group | Checks |
-|---|---|
-| Poisoned tool descriptions | hidden instructions, invisible Unicode, references to sensitive files, "do not tell the user" directives, suspicious exfiltration parameters, cross-server tool references, encoded payloads, abnormal length |
-| Configuration | plaintext secrets, unpinned packages, remote servers without TLS, shell pipelines in commands, typosquatted package names, whole-filesystem access |
-| Change and conflict | tool description changed since baseline, tool name collisions across servers |
-| Dangerous combinations | remote server without authentication; one agent holding private data access, untrusted input and an outbound channel at once |
+4. **Mapped to standards.** Findings reference the
+   [OWASP MCP Top 10](https://owasp.org/www-project-mcp-top-10/). A mapping to
+   the OWASP Top 10 for Agentic Applications and SARIF export for GitHub code
+   scanning are planned.
 
 ## Installation
 
@@ -63,24 +56,52 @@ Not published to PyPI yet. From a checkout:
 uv sync
 ```
 
-```bash
-uv run foretaster --version
-```
-
 ## Usage
 
-What works today is discovery: Foretaster finds agent configuration files and
-lists the MCP servers they declare. Rules and reports come next.
+Scan every agent configuration found on the machine and in the current project:
 
 ```bash
-uv run foretaster discover --project-dir path/to/project
+uv run foretaster scan
 ```
 
-Add `--json` for machine-readable output. The command only reads files: no
-server is started or contacted, and arguments, environment values, headers and
-URLs are never printed, because they routinely hold credentials.
+Scan specific files, for example the bundled sample:
 
-Supported configuration files:
+```bash
+uv run foretaster scan examples/risky-mcp.json
+```
+
+```text
+CRITICAL FT-C004 Server is started through a shell command
+  examples/risky-mcp.json:12 (server 'installer')
+  Command downloads code and executes it immediately.
+  Evidence: curl -s https://example.com/install.sh | bash
+  Fix: Run the server binary directly with explicit arguments. Never pipe a download into an interpreter.
+  OWASP MCP05:2025 Command Injection & Execution
+  ...
+Scanned 1 configuration file(s), 5 server(s). Findings: 1 critical, 2 high, 3 medium.
+```
+
+Options:
+
+| Option | Meaning |
+|---|---|
+| `--format console\|json` | Report format. The JSON report has no timestamps, so equal inputs give byte-equal reports. |
+| `--output FILE` | Write the report to a file instead of the terminal. |
+| `--fail-on SEVERITY` | Lowest severity that makes the command fail: `critical`, `high` (default), `medium`, `low`, `info` or `never`. |
+| `--project-dir DIR` | Where to look for project-level configuration. |
+
+Exit status: `0` clean, `1` findings at or above `--fail-on`, `2` the scan was
+incomplete (a file could not be parsed or a rule crashed). An incomplete scan is
+never reported as clean.
+
+Other commands: `foretaster discover` lists configuration files and servers
+without scanning them, `foretaster rules` lists the rules.
+
+Scanning only reads files: no server is started or contacted. Credentials never
+reach a report. Rules redact what they quote, and every finding is scrubbed
+again when it is created.
+
+### Supported configuration files
 
 | Client | User level | Project level |
 |---|---|---|
@@ -90,10 +111,33 @@ Supported configuration files:
 | VS Code | `Code/User/mcp.json` in the OS application-data directory | `.vscode/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | — |
 
-Comments and trailing commas are accepted. Entries the parser cannot interpret
-are reported as problems instead of being skipped silently, and duplicate keys
-are flagged: JSON parsers disagree on which duplicate wins, so the agent may
-load a different server than the one a reviewer saw.
+Comments and trailing commas are accepted.
+
+## Rules
+
+Implemented:
+
+| ID | Severity | Finds | OWASP MCP Top 10 |
+|---|---|---|---|
+| FT-C000 | low–medium | Entries the parser cannot interpret, and duplicate JSON keys: parsers disagree on which duplicate wins, so the agent may load a different server than a reviewer saw | — |
+| FT-C001 | medium–high | Credentials in plain text: known token formats, and literal values under names such as `API_KEY`, in env, headers, arguments and URLs | MCP01 |
+| FT-C002 | medium | Packages and images fetched at start-up without an exact version, commit hash or digest | MCP04 |
+| FT-C003 | medium–high | Remote servers reached over `http://` or `ws://` | MCP07, MCP01 |
+| FT-C004 | medium–critical | Servers started through an inline shell script; critical when the script downloads code and pipes it into an interpreter | MCP05, MCP04 |
+| FT-C005 | medium–high | Package names one edit away from a well-known MCP server, or containing non-ASCII look-alike letters | MCP04 |
+| FT-C006 | medium–high | Servers granted the filesystem root or a whole home directory, directly or through a container volume | MCP02 |
+
+Planned for v0.1:
+
+| Group | Checks |
+|---|---|
+| Poisoned tool descriptions | hidden instructions, invisible Unicode, references to sensitive files, "do not tell the user" directives, suspicious exfiltration parameters, cross-server tool references, encoded payloads, abnormal length |
+| Change and conflict | tool description changed since baseline, tool name collisions across servers |
+| Dangerous combinations | remote server without authentication; one agent holding private data access, untrusted input and an outbound channel at once |
+
+Known limits: the rules are heuristics. FT-C001 can miss a secret that matches
+no known format and sits under an innocent name. FT-C005 compares against a
+short built-in list of popular packages.
 
 ## Development
 

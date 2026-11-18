@@ -1,6 +1,7 @@
 """Command-line interface."""
 
 import json
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -10,7 +11,31 @@ from rich.markup import escape
 from rich.table import Table
 
 from foretaster import __version__
-from foretaster.discovery import DiscoveryResult, discover
+from foretaster.config_loader import ConfigLoadError, load_config
+from foretaster.discovery import Candidate, DiscoveryResult, LoadFailure, discover
+from foretaster.engine import run_rules
+from foretaster.models import AgentConfig, Client, Scope, Severity
+from foretaster.report import Report, build_report
+from foretaster.report.console import render_console
+from foretaster.rules import ALL_RULES, ScanTarget
+
+EXIT_FINDINGS = 1
+EXIT_INCOMPLETE = 2
+
+
+class OutputFormat(StrEnum):
+    CONSOLE = "console"
+    JSON = "json"
+
+
+class FailOn(StrEnum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+    NEVER = "never"
+
 
 app = typer.Typer(
     name="foretaster",
@@ -133,3 +158,94 @@ def _print_table(result: DiscoveryResult) -> None:
             f"[red]Could not parse[/red] {escape(str(failure.candidate.path))}: "
             f"{escape(failure.reason)}"
         )
+
+
+@app.command()
+def scan(
+    paths: Annotated[
+        list[Path] | None,
+        typer.Argument(
+            help="Configuration files to scan. Omit to scan every configuration found.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
+    project_dir: Annotated[
+        Path,
+        typer.Option(
+            "--project-dir",
+            help="Directory to search for project-level configuration.",
+            file_okay=False,
+            exists=True,
+        ),
+    ] = Path("."),
+    output_format: Annotated[
+        OutputFormat, typer.Option("--format", help="Report format.")
+    ] = OutputFormat.CONSOLE,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Write the report to a file.", dir_okay=False),
+    ] = None,
+    fail_on: Annotated[
+        FailOn,
+        typer.Option("--fail-on", help="Exit with status 1 at or above this severity."),
+    ] = FailOn.HIGH,
+) -> None:
+    """Scan agent configurations for security problems.
+
+    Reads files only: no server is started or contacted. Exit status is 0 when
+    clean, 1 when findings reach --fail-on, 2 when the scan was incomplete.
+    """
+    configs, failures = _load(paths, project_dir)
+    report = build_report(configs, failures, run_rules(ScanTarget(tuple(configs))))
+
+    if output_format is OutputFormat.JSON:
+        text = report.model_dump_json(indent=2) + "\n"
+        if output:
+            output.write_text(text, encoding="utf-8")
+        else:
+            typer.echo(text, nl=False)
+    elif output:
+        with output.open("w", encoding="utf-8") as stream:
+            render_console(report, Console(file=stream, no_color=True, width=100))
+    else:
+        render_console(report, Console())
+
+    raise typer.Exit(_exit_code(report, fail_on))
+
+
+@app.command(name="rules")
+def rules_command() -> None:
+    """List the built-in rules."""
+    table = Table(title="Rules")
+    for column in ("ID", "Severity", "Title", "Reference"):
+        table.add_column(column)
+    for rule in ALL_RULES:
+        meta = rule.meta
+        table.add_row(meta.id, meta.severity.value, meta.title, "\n".join(meta.references) or "-")
+    Console().print(table)
+
+
+def _load(
+    paths: list[Path] | None, project_dir: Path
+) -> tuple[list[AgentConfig], list[LoadFailure]]:
+    if not paths:
+        result = discover(cwd=project_dir)
+        return list(result.configs), list(result.failures)
+    configs: list[AgentConfig] = []
+    failures: list[LoadFailure] = []
+    for path in paths:
+        try:
+            configs.append(load_config(path))
+        except ConfigLoadError as exc:
+            failures.append(LoadFailure(Candidate(Client.GENERIC, Scope.USER, path), exc.reason))
+    return configs, failures
+
+
+def _exit_code(report: Report, fail_on: FailOn) -> int:
+    if report.errors:
+        return EXIT_INCOMPLETE
+    worst = report.worst()
+    if worst is None or fail_on is FailOn.NEVER:
+        return 0
+    return EXIT_FINDINGS if worst.rank <= Severity(fail_on.value).rank else 0

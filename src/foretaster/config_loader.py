@@ -17,6 +17,7 @@ from foretaster.models import (
     AgentConfig,
     Client,
     ConfigProblem,
+    ProblemKind,
     Scope,
     ServerDefinition,
     Transport,
@@ -69,6 +70,7 @@ def parse_config(
                 problems.append(
                     ConfigProblem(
                         pointer="",
+                        kind=ProblemKind.DUPLICATE_KEY,
                         message=f"duplicate key {key!r}: clients may disagree on which value wins",
                     )
                 )

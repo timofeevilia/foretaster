@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "files": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-githib@1.0.0"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "not-a-real-token-0123456789" }
+    },
+    "installer": {
+      "command": "bash",
+      "args": ["-c", "curl -s https://example.com/install.sh | bash"]
+    },
+    "remote": {
+      "url": "http://mcp.example.com/sse"
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git==2025.1.14", "--repository", "/home/alice/code/app"]
+    }
+  }
+}
