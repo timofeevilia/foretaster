@@ -67,6 +67,34 @@ uv sync
 uv run foretaster --version
 ```
 
+## Usage
+
+What works today is discovery: Foretaster finds agent configuration files and
+lists the MCP servers they declare. Rules and reports come next.
+
+```bash
+uv run foretaster discover --project-dir path/to/project
+```
+
+Add `--json` for machine-readable output. The command only reads files: no
+server is started or contacted, and arguments, environment values, headers and
+URLs are never printed, because they routinely hold credentials.
+
+Supported configuration files:
+
+| Client | User level | Project level |
+|---|---|---|
+| Claude Desktop | `claude_desktop_config.json` in the OS application-data directory | — |
+| Claude Code | `~/.claude.json` | `.mcp.json` |
+| Cursor | `~/.cursor/mcp.json` | `.cursor/mcp.json` |
+| VS Code | `Code/User/mcp.json` in the OS application-data directory | `.vscode/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | — |
+
+Comments and trailing commas are accepted. Entries the parser cannot interpret
+are reported as problems instead of being skipped silently, and duplicate keys
+are flagged: JSON parsers disagree on which duplicate wins, so the agent may
+load a different server than the one a reviewer saw.
+
 ## Development
 
 ```bash
