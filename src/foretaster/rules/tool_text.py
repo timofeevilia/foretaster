@@ -95,7 +95,29 @@ class HiddenInstructions(_PhraseRule):
             "a directive addressed to the model",
             Severity.MEDIUM,
             r"\b(?:you|the\s+(?:assistant|model|ai|llm|agent))\s+"
-            r"(?:must|shall|have\s+to|are\s+required\s+to)\s+(?:always|never|first|now)\b",
+            r"(?:must|shall|have\s+to|are\s+required\s+to)\s+(?:always|never|now)\b",
+        ),
+        (
+            "an order to disregard what the user asked for",
+            Severity.HIGH,
+            r"\b(?:ignore|disregard|discard)\b[^.]{0,30}\b(?:user(?:'s)?|their)\b[^.]{0,25}"
+            r"\b(?:input|query|request|choice|selection|instructions?|value|specified)\b",
+        ),
+        (
+            "a claim of priority over the user",
+            Severity.HIGH,
+            r"\bpriority\b[^.]{0,40}\b(?:higher|over|above)\b[^.]{0,40}\b(?:user|request|query)"
+            r"|\b(?:overrides?|supersedes?|takes?\s+precedence\s+over)\b[^.]{0,30}"
+            r"\buser(?:'s)?\b"
+            r"|\bhigh(?:est)?[\s-]priority\s+system\s+(?:rule|instruction|directive)\b",
+        ),
+        (
+            "a threat of failure meant to force compliance",
+            Severity.MEDIUM,
+            r"\b(?:failure\s+to\s+(?:do\s+so|comply|log|validate|follow)|skipping\s+this"
+            r"|not\s+doing\s+(?:so|this))\b[^.]{0,60}"
+            r"\b(?:will|may|would|can)\s+(?:cause|corrupt|crash|disrupt|break|fail|result|lead)"
+            r"|\bthis\s+is\s+not\s+optional\b|\bnon-negotiable\b",
         ),
     )
 
