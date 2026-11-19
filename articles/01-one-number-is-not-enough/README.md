@@ -1,7 +1,7 @@
 # Article 1: one quality figure is not enough
 
-A short post about measuring Foretaster on two corpora: 93.8% of attacks flagged
-on the held-out part of the first, 32.6% on the second.
+A short post about commands hidden in tool descriptions and how far an automatic
+check can be relied on: 93.8% of attacks flagged on one corpus, 32.6% on another.
 
 | File | Purpose |
 |---|---|
@@ -11,8 +11,9 @@ on the held-out part of the first, 32.6% on the second.
 | `slides/slide-ru-*.png`, `slides/slide-en-*.png` | Four square 1200×1200 slides per language |
 | `slides/slides-ru.pdf`, `slides/slides-en.pdf` | The same slides as one document, for a LinkedIn document post |
 
-The text, in the post and on the slides, is written as a first-person build log
-in plain speech. The slides keep the restrained plum-and-teal look.
+The text is written for a reader who does not know what MCP is: it explains
+the threat first, then what an automatic check can and cannot find, and ends on
+what follows for anyone who connects tools to an assistant.
 
 Every figure in the text and on the slides comes from
 [benchmark/README.md](../../benchmark/README.md). The other scanner measured
