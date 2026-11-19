@@ -334,7 +334,7 @@ below 90% fails the build.
 |---|---|---|
 | 1 | Scanner core: config discovery, rule engine, 19 rules, JSON / SARIF / HTML reports, rug-pull detection | done |
 | 2 | Benchmark: Foretaster and other scanners measured on independent corpora | done: two corpora and one other scanner measured |
-| 3 | Project site: documentation, benchmark charts, in-browser config check | planned |
+| 3 | Project site with an in-browser check | built and tested; not yet published |
 | 4 | GitHub Action, PyPI release, optional LLM layer | planned |
 | 5 | Honeypot for attacks on AI infrastructure, feeding new rules | planned |
 
