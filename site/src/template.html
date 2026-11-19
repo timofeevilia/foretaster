@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="{{description}}">
+<title>{{title}}</title>
+<link rel="icon" href="{{base}}favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{{base}}styles.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="topbar">
+      <a class="brand" href="{{base_lang}}">Foretaster</a>
+      <nav>
+        <a href="#how">{{nav_how}}</a>
+        <a href="#try">{{nav_try}}</a>
+        <a href="#measured">{{nav_measured}}</a>
+        <a href="{{other_href}}">{{other_lang}}</a>
+      </nav>
+    </div>
+    <div class="eyebrow">{{hero_eyebrow}}</div>
+    <h1>{{hero_title}}</h1>
+    <p class="lead">{{hero_lead}}</p>
+    <div class="actions">
+      <a class="button gold" href="#try">{{hero_try}}</a>
+      <a class="button ghost" href="{{repository}}">{{hero_code}}</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="how">
+    <div class="eyebrow">{{how_eyebrow}}</div>
+    <h2>{{how_title}}</h2>
+    <p class="intro">{{how_intro}}</p>
+    <div class="steps">
+      <div class="step"><b>1</b><p>{{how_1}}</p></div>
+      <div class="step"><b>2</b><p>{{how_2}}</p></div>
+      <div class="step"><b>3</b><p>{{how_3}}</p></div>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="eyebrow">{{try_eyebrow}}</div>
+    <h2>{{try_title}}</h2>
+    <p class="intro">{{try_intro}}</p>
+    <div class="demo">
+      <div class="row">
+        <button class="button light" id="example-config" type="button">{{try_example_config}}</button>
+        <button class="button light" id="example-tools" type="button">{{try_example_tools}}</button>
+      </div>
+      <textarea id="input" spellcheck="false" autocomplete="off" placeholder="{{try_placeholder}}" aria-label="{{try_placeholder}}"></textarea>
+      <div class="row">
+        <button class="button" id="run" type="button">{{try_run}}</button>
+        <span id="status" role="status" aria-live="polite"></span>
+      </div>
+      <div id="results"></div>
+      <p class="privacy">{{try_privacy}}</p>
+    </div>
+  </section>
+
+  <section id="finds">
+    <div class="eyebrow">{{finds_eyebrow}}</div>
+    <h2>{{finds_title}}</h2>
+    <div class="cards">
+      <div class="card"><h3>{{finds_1_title}}</h3><p>{{finds_1}}</p></div>
+      <div class="card"><h3>{{finds_2_title}}</h3><p>{{finds_2}}</p></div>
+      <div class="card"><h3>{{finds_3_title}}</h3><p>{{finds_3}}</p></div>
+    </div>
+  </section>
+
+  <section id="measured">
+    <div class="eyebrow">{{measured_eyebrow}}</div>
+    <h2>{{measured_title}}</h2>
+    <p class="intro">{{measured_intro}}</p>
+    <div class="charts">
+      <div class="chart"><h3>{{chart_1_title}}</h3><p>{{chart_1_text}}</p>{{{chart_1}}}</div>
+      <div class="chart"><h3>{{chart_2_title}}</h3><p>{{chart_2_text}}</p>{{{chart_2}}}</div>
+    </div>
+    <ul class="caveats">
+      <li>{{caveat_1}}</li>
+      <li>{{caveat_2}}</li>
+      <li>{{caveat_3}}</li>
+    </ul>
+    <p><a href="{{repository}}/blob/main/benchmark/README.md">{{measured_link}}</a></p>
+  </section>
+
+  <section id="run-locally">
+    <div class="eyebrow">{{run_eyebrow}}</div>
+    <h2>{{run_title}}</h2>
+    <p class="intro">{{run_intro}}</p>
+    <pre class="command">{{command}}</pre>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>{{footer_license}} Foretaster {{version}}.</p>
+    <p>
+      <a href="{{repository}}">{{footer_code}}</a>
+      <a href="{{repository}}/blob/main/benchmark/README.md">{{footer_benchmark}}</a>
+      <a href="{{repository}}/security/advisories/new">{{footer_security}}</a>
+    </p>
+  </div>
+</footer>
+
+<script type="application/json" id="ui">{{{ui_json}}}</script>
+<script type="application/json" id="ex-config">{{{example_config}}}</script>
+<script type="application/json" id="ex-tools">{{{example_tools}}}</script>
+<script type="module" src="{{base}}app.js"></script>
+</body>
+</html>

@@ -16,3 +16,6 @@ htmlcov/
 .vscode/
 .DS_Store
 benchmark/.cache/
+site/dist/
+site/.cache/
+site/node_modules/

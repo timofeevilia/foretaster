@@ -19,8 +19,13 @@ from foretaster.models import Location, ServerInventory, ToolDefinition
 
 def load_tool_manifest(path: Path) -> list[ServerInventory]:
     """Read a manifest file. Raises :class:`ConfigLoadError` when it is unusable."""
+    return parse_tool_manifest(read_text(path), path=path)
+
+
+def parse_tool_manifest(text: str, *, path: Path) -> list[ServerInventory]:
+    """Parse manifest text. ``path`` is recorded but never opened."""
     try:
-        data = json.loads(read_text(path))
+        data = json.loads(text)
     except (json.JSONDecodeError, RecursionError) as exc:
         raise ConfigLoadError(path, f"invalid JSON: {exc}") from exc
     if isinstance(data, dict) and isinstance(data.get("result"), dict):
