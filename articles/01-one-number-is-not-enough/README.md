@@ -11,6 +11,9 @@ on the held-out part of the first, 32.6% on the second.
 | `slides/slide-ru-*.png`, `slides/slide-en-*.png` | Four square 1200×1200 slides per language |
 | `slides/slides-ru.pdf`, `slides/slides-en.pdf` | The same slides as one document, for a LinkedIn document post |
 
+The voice and the look follow maker-video conventions: first person, plain
+speech, a blueprint-style background, big numbers and short hand-written labels.
+
 Every figure in the text and on the slides comes from
 [benchmark/README.md](../../benchmark/README.md). The other scanner measured
 there is not named in the post, because the post has no room for the
