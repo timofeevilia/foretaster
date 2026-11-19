@@ -51,13 +51,21 @@ makes the description an attack surface:
 
 ## Installation
 
-Not published to PyPI yet. From a checkout:
+Not published to PyPI yet. With [uv](https://docs.astral.sh/uv/) installed, one
+command downloads the scanner from GitHub and checks the agent configurations
+on your machine, without installing anything permanently:
+
+```bash
+uvx --from git+https://github.com/timofeevilia/foretaster foretaster scan
+```
+
+To work on the code, clone the repository and run:
 
 ```bash
 uv sync
 ```
 
-Requires Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11 or newer.
 
 ## Usage
 
