@@ -1,0 +1,16 @@
+cb389bfa68b89223647a14cb2429e80a6d903b9578a430849bbf57ae92091012  ./.htaccess
+b40a403ad279fee261a090f9ec10eb0abaeead5af45afcddeac657bac0d4c97c  ./app.js
+b6b8676bd2a45fb6691ab3016d1dfccf65a776a4b7f1446e19e6f5368e00218f  ./favicon.svg
+c3ee28b9e99d24ecfb7f10b5e9ebd4355af1bf7b6b2d9d63b38076e81f41a9ae  ./index.html
+5d432ed90c566a0e22a13b052b0cf7d98fa334804bdc687a00519bb01e268d6d  ./pkg/foretaster-0.1.0-py3-none-any.whl
+6541523b4b16c1953d2fc9b82fb86c540eea9f78fca329ab371ed13a8b0faa51  ./pyodide/annotated_types-0.7.0-py3-none-any.whl
+04854875001e07a8a74d87b7c80296cba168773d8c9804e232d695f82484d7d7  ./pyodide/pydantic-2.12.5-py3-none-any.whl
+54703fa42a0d4d574283cfb8f08050ba7820c9a42b0a21bc1286407d9a9e54da  ./pyodide/pydantic_core-2.41.5-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+5dc2fc119108bc148c7457dc86e7675b5c87e1cafd420b9c34c1eaef7b36c010  ./pyodide/pyodide-lock.json
+22514b8be6980e28a02c8b1d6387ce8dfe666fc4edf8d547cff5dce29ff4d972  ./pyodide/pyodide.asm.mjs
+e14d49ceca9b4a0e274ea918f3a898de2d3880b6e5573a6cfe1a2267ecc70329  ./pyodide/pyodide.asm.wasm
+1bb8cc14f9405aaa7cd4e00c12edd0a8539de9cc026618d6ee5a9663f367dc70  ./pyodide/pyodide.mjs
+2bd3394a145bfbbe5bbc9d9d6ab9136abbb986c6fef6c142b3a2962227aa5c28  ./pyodide/python_stdlib.zip
+4fec68770a05408e668a4fa53d6bf4f0f684b9dacf820c7c5d6e97d3ad225e29  ./pyodide/typing_extensions-4.15.0-py3-none-any.whl
+deb989630985f7a7296b90357a947a804a7612cecbb6439d6e71128e01f61051  ./pyodide/typing_inspection-0.4.2-py3-none-any.whl
+c3abfa1a645a724983c21e9a37efe2b31be3a863604a3601d8bbf25a142ccf00  ./styles.css
