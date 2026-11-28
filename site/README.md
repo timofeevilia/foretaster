@@ -25,15 +25,15 @@ cd site && npm ci && npx playwright install chromium
 node site/smoke.mjs
 ```
 
-The smoke test serves `site/dist`, runs the demo in a real browser in both
-languages, and fails on a console error, on any request that leaves the site,
+The smoke test serves `site/dist`, runs the demo in a real browser with both
+examples, and fails on a console error, on any request that leaves the site,
 and on markup from scanned text reaching the page.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `content.py` | Page text in English and Russian |
+| `content.py` | Page text |
 | `src/template.html` | Page layout |
 | `src/styles.css`, `src/app.js` | Styling and the demo |
 | `htaccess` | Apache settings and security headers, deployed as `.htaccess` |

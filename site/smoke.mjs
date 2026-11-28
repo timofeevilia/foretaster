@@ -1,5 +1,5 @@
 // End-to-end check of the built site: serves site/dist, runs the demo in a real browser
-// in both languages, and fails on any console error, blocked request or injected markup.
+// with both examples, and fails on any console error, blocked request or injected markup.
 //
 //     node site/smoke.mjs [screenshot-directory]
 
@@ -73,15 +73,14 @@ async function check(path, exampleButton, expectedRules) {
     await page.click(exampleButton);
     await page.click("#run");
     await page.waitForSelector("#results .finding");
-    const name = path === "/" ? "en" : "ru";
-    await page.screenshot({ path: join(shots, `site-${name}.png`), fullPage: true });
+    await page.screenshot({ path: join(shots, `site-${exampleButton.slice(1)}.png`), fullPage: true });
   }
   await page.close();
 }
 
 try {
   await check("/", "#example-config", ["FT-C004", "FT-C006", "FT-C001"]);
-  await check("/ru/", "#example-tools", ["FT-T001", "FT-T003", "FT-T004"]);
+  await check("/", "#example-tools", ["FT-T001", "FT-T003", "FT-T004"]);
 } finally {
   await browser.close();
   server.close();

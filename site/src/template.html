@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{lang}}">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,19 +7,18 @@
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="{{description}}">
 <title>{{title}}</title>
-<link rel="icon" href="{{base}}favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="{{base}}styles.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="hero">
   <div class="wrap">
     <div class="topbar">
-      <a class="brand" href="{{base_lang}}">Foretaster</a>
+      <a class="brand" href="./">Foretaster</a>
       <nav>
         <a href="#how">{{nav_how}}</a>
         <a href="#try">{{nav_try}}</a>
         <a href="#measured">{{nav_measured}}</a>
-        <a href="{{other_href}}">{{other_lang}}</a>
       </nav>
     </div>
     <div class="eyebrow">{{hero_eyebrow}}</div>
@@ -111,6 +110,6 @@
 <script type="application/json" id="ui">{{{ui_json}}}</script>
 <script type="application/json" id="ex-config">{{{example_config}}}</script>
 <script type="application/json" id="ex-tools">{{{example_tools}}}</script>
-<script type="module" src="{{base}}app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
