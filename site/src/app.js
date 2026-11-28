@@ -24,7 +24,7 @@ function setStatus(text, isError = false) {
 
 async function loadScanner() {
   // Absolute URLs: a dynamic import treats "pyodide/..." as a package name, not a path.
-  const root = new URL(ui.base, document.baseURI);
+  const root = new URL("./", document.baseURI);
   const { loadPyodide } = await import(new URL("pyodide/pyodide.mjs", root).href);
   const pyodide = await loadPyodide({ indexURL: new URL("pyodide/", root).href });
   await pyodide.loadPackage(["pydantic"]);

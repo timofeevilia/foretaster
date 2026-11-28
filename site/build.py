@@ -132,12 +132,11 @@ def load_numbers() -> dict[str, Any]:
     }
 
 
-def percent(entry: dict[str, Any], lang: str) -> str:
-    text = f"{entry['hits'] / entry['total']:.1%}"
-    return text.replace(".", ",") if lang == "ru" else text
+def percent(entry: dict[str, Any]) -> str:
+    return f"{entry['hits'] / entry['total']:.1%}"
 
 
-def chart(bars: list[tuple[str, dict[str, Any], str]], lang: str, of: str) -> str:
+def chart(bars: list[tuple[str, dict[str, Any], str]], of: str) -> str:
     """Horizontal bars as inline SVG. Geometry sits in attributes, so no inline CSS is needed."""
     row, label_width, track, height = 62, 0, 520, 0
     parts = []
@@ -149,29 +148,25 @@ def chart(bars: list[tuple[str, dict[str, Any], str]], lang: str, of: str) -> st
             f'<rect x="0" y="{y + 24}" width="{track}" height="22" rx="4" fill="#f1e9f3"/>'
             f'<rect x="0" y="{y + 24}" width="{width:.1f}" height="22" rx="4" fill="{colour}"/>'
             f'<text class="num" x="{track + 14}" y="{y + 43}" font-size="24">'
-            f"{percent(entry, lang)}</text>"
+            f"{percent(entry)}</text>"
             f'<text class="sub" x="{track + 14}" y="{y + 16}" font-size="13">'
             f"{entry['hits']} {html.escape(of)} {entry['total']}</text>"
         )
         height = y + row
     return (
         f'<svg viewBox="0 0 640 {height}" role="img" aria-label="'
-        + html.escape("; ".join(f"{label}: {percent(e, lang)}" for label, e, _ in bars))
+        + html.escape("; ".join(f"{label}: {percent(e)}" for label, e, _ in bars))
         + '">'
         + "".join(parts)
         + "</svg>"
     )
 
 
-def render(lang: str, numbers: dict[str, Any], wheel: str, examples: dict[str, str]) -> str:
-    text = dict(CONTENT[lang])
-    base = "" if lang == "en" else "../"
+def render(numbers: dict[str, Any], wheel: str, examples: dict[str, str]) -> str:
+    text = dict(CONTENT)
     plum, teal = "#7e4b82", "#4c858c"
     values = {
         **text,
-        "base": base,
-        "base_lang": "./",
-        "other_href": "ru/" if lang == "en" else "../",
         "repository": REPOSITORY,
         "command": COMMAND,
         "version": version("foretaster"),
@@ -183,14 +178,13 @@ def render(lang: str, numbers: dict[str, Any], wheel: str, examples: dict[str, s
         ),
     }
     ui = {key[3:]: value for key, value in text.items() if key.startswith("ui_")}
-    ui.update({"base": base, "wheel": wheel})
+    ui["wheel"] = wheel
     raw = {
         "chart_1": chart(
             [
                 (text["bar_before"], numbers["before"], "#b99dbc"),
                 (text["bar_after"], numbers["after"], plum),
             ],
-            lang,
             text["of"],
         ),
         "chart_2": chart(
@@ -199,7 +193,6 @@ def render(lang: str, numbers: dict[str, Any], wheel: str, examples: dict[str, s
                 (text["bar_devices"], numbers["wild_devices"], "#8fb8bd"),
                 (text["bar_plain"], numbers["wild_plain"], "#8fb8bd"),
             ],
-            lang,
             text["of"],
         ),
         # "<" is escaped so that no text can close the script element it sits in.
@@ -223,7 +216,7 @@ FAVICON = (
 def build(dist: Path, cache: Path) -> None:
     if dist.exists():
         shutil.rmtree(dist)
-    (dist / "ru").mkdir(parents=True)
+    dist.mkdir(parents=True)
     for name in ("styles.css", "app.js"):
         shutil.copy(ROOT / "src" / name, dist / name)
     (dist / "favicon.svg").write_text(FAVICON, encoding="utf-8")
@@ -240,10 +233,7 @@ def build(dist: Path, cache: Path) -> None:
         "tools": (PROJECT / "examples" / "poisoned-tools.json").read_text(encoding="utf-8"),
     }
     numbers = load_numbers()
-    (dist / "index.html").write_text(render("en", numbers, wheel, examples), encoding="utf-8")
-    (dist / "ru" / "index.html").write_text(
-        render("ru", numbers, wheel, examples), encoding="utf-8"
-    )
+    (dist / "index.html").write_text(render(numbers, wheel, examples), encoding="utf-8")
     size = sum(path.stat().st_size for path in dist.rglob("*") if path.is_file())
     print(f"built {dist} ({size / 1_000_000:.1f} MB, wheel {wheel})")
 
