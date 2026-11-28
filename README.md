@@ -15,7 +15,8 @@ swallows them.
 > **Status: pre-alpha.** The scanner core is feature-complete: 19 rules, four
 > report formats, rug-pull detection. Measurements on two independent corpora
 > are published [below](#benchmark): 94% of attacks flagged on one, 33% on the
-> other. See the [roadmap](#roadmap).
+> other. An optional review by a language model (`--llm`) is implemented and
+> has not been measured yet. See the [roadmap](#roadmap).
 
 ## Why
 
@@ -40,8 +41,10 @@ makes the description an attack surface:
    else's code. By default Foretaster only reads configuration files. Connecting
    to a server is opt-in, and even then Foretaster lists tools and never calls
    them.
-2. **No account, no network.** The deterministic rules run fully offline. An
-   LLM-based layer for semantic checks is optional.
+2. **Nothing leaves the machine unless you ask.** The deterministic rules need
+   no account and run fully offline. The review by a language model is opt-in,
+   and sends tool names, descriptions and parameter texts to the model
+   provider, never a configuration file.
 3. **Measured, not claimed.** Detection quality is reported on corpora written
    by other people, misses included. See [Benchmark](#benchmark).
 4. **Mapped to standards.** Findings reference the
@@ -65,7 +68,9 @@ To work on the code, clone the repository and run:
 uv sync
 ```
 
-Requires Python 3.11 or newer.
+Requires Python 3.11 or newer. Two features are optional extras, so that the
+core has few dependencies: `connect` for `--connect`, and `llm` for `--llm`.
+`uv sync --all-extras` installs both.
 
 ## Usage
 
@@ -150,6 +155,51 @@ uv run foretaster scan --tools examples/poisoned-tools.json --baseline .foretast
 A changed description or parameter list is reported as FT-D001 (high), a tool
 added since the baseline as medium. `baseline` accepts `--connect` too.
 
+### Review by a language model
+
+The rules above match patterns, and an attack written as an ordinary sentence
+matches none of them. With `--llm`, every tool definition is also read by a
+language model, which reports text that directs the agent instead of
+describing the tool:
+
+```bash
+export ANTHROPIC_API_KEY=...
+```
+
+```bash
+uv run foretaster scan --tools examples/poisoned-tools.json --llm
+```
+
+What this costs you, and what was done about it:
+
+- **It sends data out.** Tool names, descriptions and parameter texts go to the
+  Claude API, with recognisable credentials scrubbed first. Configuration
+  files, environment values, headers and URLs are never sent. The command
+  prints how many definitions were sent.
+- **It costs money.** Requests are billed to your API key. Verdicts are
+  remembered in a local cache, so a tool is sent again only when its
+  definition changes; `--no-llm-cache` turns that off.
+- **It is not deterministic.** The same text can get a different verdict on
+  another day. Findings carry the model's reasoning and the excerpt it points
+  at, so that you can check them.
+- **The reviewer is itself a target.** The text it reads is written by a
+  possible attacker to manipulate language models. So its verdicts only ever
+  add findings and never remove one the rules made; an answer that is missing,
+  malformed or does not cover every tool makes the scan incomplete (exit
+  status 2) instead of clean; tools are numbered by the scanner, so a tool
+  cannot answer for another by its name; and a quoted excerpt is kept only if
+  it really occurs in the text.
+
+The model is `claude-opus-5-5` unless `--llm-model` or `FORETASTER_LLM_MODEL`
+says otherwise. If the provider's safety classifier declines a request, the
+API is asked to re-run it on another model, because attack text is exactly
+what such a classifier may decline.
+
+**Not measured yet.** How many attacks this review catches, and how many
+genuine tools it flags by mistake, will be reported in
+[Benchmark](#benchmark) once it has been run on the same two corpora. Until
+then, treat its findings as a second opinion.
+
 ### Reports
 
 | Format | Use |
@@ -173,20 +223,25 @@ uv run foretaster scan --format html --output report.html
 | `--connect` | Ask the configured servers for their tools. Runs their commands. |
 | `--timeout SECONDS` | How long to wait for each server with `--connect`. |
 | `--baseline FILE` | Compare tool definitions with a recorded baseline. |
+| `--llm` | Also have a language model read every tool definition. Sends them to the Claude API; needs `ANTHROPIC_API_KEY`. |
+| `--llm-model NAME` | Model for `--llm`. |
+| `--no-llm-cache` | Do not remember the model's verdicts between runs. |
 | `--format console\|json\|sarif\|html` | Report format. |
 | `--output FILE` | Write the report to a file instead of the terminal. |
 | `--fail-on SEVERITY` | Lowest severity that makes the command fail: `critical`, `high` (default), `medium`, `low`, `info` or `never`. |
 | `--project-dir DIR` | Where to look for project-level configuration. |
 
 Exit status: `0` clean, `1` findings at or above `--fail-on`, `2` the scan was
-incomplete (a file could not be parsed, a server did not answer or a rule
-crashed). An incomplete scan is never reported as clean.
+incomplete (a file could not be parsed, a server did not answer, a rule
+crashed, or with `--llm` the model did not review a tool). An incomplete scan
+is never reported as clean.
 
 Other commands: `foretaster baseline` records tool definitions,
 `foretaster discover` lists configuration files and servers without scanning
 them, `foretaster rules` lists the rules.
 
-Without `--connect`, scanning only reads files. Credentials never reach a
+Without `--connect`, scanning only reads files, and without `--llm` it sends
+nothing anywhere. Credentials never reach a
 report: rules redact what they quote, and every finding is scrubbed again when
 it is created. Text that comes from a server is escaped to visible characters
 before it is printed, so a hostile description cannot rewrite your terminal.
@@ -245,11 +300,18 @@ Rules about change over time and about combinations:
 | FT-X001 | medium | A network server that listed its tools to the scanner although no credential was sent (`--connect` only) | MCP07 |
 | FT-X002 | medium | The "lethal trifecta": servers of one agent that together read private data, take in untrusted content and can send data out | MCP10, MCP02 |
 
+Optional, off by default:
+
+| ID | Severity | Finds | OWASP MCP Top 10 |
+|---|---|---|---|
+| FT-L001 | medium–high | Tool text that a language model judged to direct the agent instead of describing the tool (`--llm` only; a model's opinion, quoted with its reasoning) | MCP03, MCP06 |
+
 Known limits:
 
 - The rules are pattern-based heuristics. An instruction phrased in a way no
-  pattern anticipates, or written in a language other than English, passes. The
-  optional LLM layer planned for stage 4 targets this gap.
+  pattern anticipates, or written in a language other than English, passes.
+  The review by a language model (`--llm`) targets this gap; how well it closes
+  it has not been measured yet.
 - FT-C001 can miss a secret that matches no known format and sits under an
   innocent name. FT-C005 compares against a short built-in list of popular
   packages.
@@ -299,7 +361,9 @@ Read the two tables together:
   and cloud analyzers were not measured and would likely do better.
 
 Pattern rules find attacks whose wording has been seen before. That is useful
-and not enough, which is why an optional LLM layer is next on the roadmap.
+and not enough, which is why a review by a language model was added as an
+option. It is not in these figures: measuring it on the same two corpora is
+the next step.
 
 Method, caveats and full tables: [benchmark/README.md](benchmark/README.md).
 
@@ -334,8 +398,9 @@ below 90% fails the build.
 |---|---|---|
 | 1 | Scanner core: config discovery, rule engine, 19 rules, JSON / SARIF / HTML reports, rug-pull detection | done |
 | 2 | Benchmark: Foretaster and other scanners measured on independent corpora | done: two corpora and one other scanner measured |
-| 3 | Project site with an in-browser check | built and tested; not yet published |
-| 4 | GitHub Action, PyPI release, optional LLM layer | planned |
+| 3 | Project site with an in-browser check | done |
+| 4 | Optional review by a language model | implemented; not measured yet |
+| 4 | GitHub Action, PyPI release | planned |
 | 5 | Honeypot for attacks on AI infrastructure, feeding new rules | planned |
 
 ## Security

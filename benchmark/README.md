@@ -256,6 +256,36 @@ uv run python -m benchmark run mcptox --scanner cisco-yara --cisco-bin cisco-ven
 uv run python -m benchmark compare benchmark/results/mcptox-foretaster.json benchmark/results/mcptox-cisco-yara.json --output benchmark/results/mcptox-comparison.md
 ```
 
+### The review by a language model
+
+The scanners `foretaster+llm` (pattern rules and the model) and
+`foretaster-llm-only` (the model alone) call a paid API. Price a run before
+making it; this calls nothing and writes nothing:
+
+```bash
+uv run python -m benchmark run mcptox --scanner foretaster+llm --llm-model claude-haiku-5-5 --estimate
+```
+
+Then run it with `ANTHROPIC_API_KEY` set:
+
+```bash
+uv run python -m benchmark run mcptox --scanner foretaster+llm --llm-model claude-haiku-5-5 --label foretaster-llm-haiku
+```
+
+Verdicts are kept in `benchmark/.cache/`, so an interrupted run resumes
+without paying twice, and the result file records the tokens used. A tool the
+model did not judge stops the run instead of being counted as passed.
+
+No result of these scanners is published yet. Three things will have to be
+said next to any figure they produce:
+
+- The reviewer's instructions were written by someone who had already seen
+  both corpora, so neither is unseen for this layer the way the second corpus
+  was for the pattern rules.
+- Both corpora are public, and the model may have met them in training.
+- The model's answers vary between runs; a figure is one run unless stated
+  otherwise.
+
 ## Attribution
 
 MCPTox: Zhiqiang Wang, Yichao Gao, Yanting Wang, Suyuan Liu, Haifeng Sun, Haoran
