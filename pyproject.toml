@@ -42,6 +42,9 @@ foretaster = "foretaster.cli:app"
 connect = [
     "mcp>=2,<3",
 ]
+llm = [
+    "anthropic>=1,<2",
+]
 
 [dependency-groups]
 dev = [

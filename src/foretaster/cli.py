@@ -16,12 +16,14 @@ from foretaster.config_loader import ConfigLoadError, load_config
 from foretaster.discovery import Candidate, DiscoveryResult, LoadFailure, discover
 from foretaster.engine import run_rules
 from foretaster.live import DEFAULT_TIMEOUT, ConnectionFailure, ConnectUnavailableError, collect
+from foretaster.llm import Model, Reviewer, VerdictCache, default_cache_path
+from foretaster.llm.anthropic_model import DEFAULT_MODEL, AnthropicModel, LlmUnavailableError
 from foretaster.models import AgentConfig, Client, Scope, ServerInventory, Severity
 from foretaster.report import Report, build_report
 from foretaster.report.console import render_console
 from foretaster.report.html import render_html
 from foretaster.report.sarif import render_sarif
-from foretaster.rules import ALL_RULES, ScanTarget
+from foretaster.rules import ALL_RULES, OPTIONAL_RULES, LlmReview, Rule, ScanTarget
 from foretaster.tool_manifest import load_tool_manifest
 
 EXIT_FINDINGS = 1
@@ -216,6 +218,26 @@ def scan(
             dir_okay=False,
         ),
     ] = None,
+    llm: Annotated[
+        bool,
+        typer.Option(
+            "--llm",
+            help="Also have a language model read every tool definition. This sends tool "
+            "names, descriptions and parameter texts to the Claude API and needs "
+            "ANTHROPIC_API_KEY. Configuration files are never sent.",
+        ),
+    ] = False,
+    llm_model: Annotated[
+        str,
+        typer.Option("--llm-model", help="Model for --llm.", envvar="FORETASTER_LLM_MODEL"),
+    ] = DEFAULT_MODEL,
+    llm_cache: Annotated[
+        bool,
+        typer.Option(
+            "--llm-cache/--no-llm-cache",
+            help="Remember the model's verdicts so that unchanged tools are not sent again.",
+        ),
+    ] = True,
     output_format: Annotated[
         OutputFormat, typer.Option("--format", help="Report format.")
     ] = OutputFormat.CONSOLE,
@@ -230,10 +252,21 @@ def scan(
 ) -> None:
     """Scan agent configurations and tool descriptions for security problems.
 
-    Reads files only, unless --connect is given. Exit status is 0 when clean,
-    1 when findings reach --fail-on, 2 when the scan was incomplete.
+    Reads files only, unless --connect is given, and sends nothing anywhere,
+    unless --llm is given. Exit status is 0 when clean, 1 when findings reach
+    --fail-on, 2 when the scan was incomplete.
     """
     gathered = _gather(paths, tools, project_dir, connect, timeout)
+    reviewer: Reviewer | None = None
+    rules: list[Rule] | None = None
+    if llm:
+        try:
+            model = _make_model(llm_model)
+        except LlmUnavailableError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(EXIT_INCOMPLETE) from exc
+        reviewer = Reviewer(model, VerdictCache(default_cache_path() if llm_cache else None))
+        rules = [rule() for rule in ALL_RULES] + [LlmReview(reviewer)]
     known: Baseline | None = None
     if baseline:
         try:
@@ -246,10 +279,12 @@ def scan(
     report = build_report(
         gathered.configs,
         gathered.failures,
-        run_rules(target),
+        run_rules(target, rules),
         gathered.inventories,
         gathered.unreachable,
     )
+    if reviewer is not None:
+        typer.echo(_llm_note(reviewer), err=True)
 
     if output_format is OutputFormat.CONSOLE:
         if output:
@@ -270,6 +305,34 @@ def scan(
             typer.echo(text, nl=False)
 
     raise typer.Exit(_exit_code(report, fail_on))
+
+
+def _make_model(name: str) -> Model:
+    """Build the reviewer model. Raises ``LlmUnavailableError`` when it cannot be used."""
+    try:
+        return AnthropicModel(name)
+    except LlmUnavailableError:
+        raise
+    except Exception as exc:
+        # The client library refuses to start without credentials.
+        raise LlmUnavailableError(
+            f"the LLM review could not start: {exc}. Set ANTHROPIC_API_KEY to a Claude API key."
+        ) from exc
+
+
+def _llm_note(reviewer: Reviewer) -> str:
+    stats = reviewer.stats
+    if not stats.items:
+        return (
+            "LLM review: nothing to review. The model reads tool definitions, "
+            "which a scan has only with --connect or --tools."
+        )
+    sent = stats.items - stats.cached - stats.failed
+    return (
+        f"LLM review by {reviewer.model.identity}: {stats.items} tool definition(s), "
+        f"{sent} sent in {stats.requests} request(s), {stats.cached} answered from the cache, "
+        f"{stats.failed} not reviewed."
+    )
 
 
 @app.command(name="baseline")
@@ -372,9 +435,10 @@ def rules_command() -> None:
     table = Table(title="Rules")
     for column in ("ID", "Severity", "Title", "Reference"):
         table.add_column(column)
-    for rule in ALL_RULES:
+    for rule in (*ALL_RULES, *OPTIONAL_RULES):
         meta = rule.meta
-        table.add_row(meta.id, meta.severity.value, meta.title, "\n".join(meta.references) or "-")
+        title = meta.title + (" (only with --llm)" if rule in OPTIONAL_RULES else "")
+        table.add_row(meta.id, meta.severity.value, title, "\n".join(meta.references) or "-")
     Console().print(table)
 
 

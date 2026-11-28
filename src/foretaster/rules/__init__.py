@@ -5,6 +5,7 @@ from foretaster.rules.cleartext import CleartextTransport
 from foretaster.rules.combos import LethalTrifecta, OpenRemoteServer
 from foretaster.rules.drift import ChangedSinceBaseline, ToolNameCollision
 from foretaster.rules.filesystem import BroadFilesystemAccess
+from foretaster.rules.llm_review import LlmReview
 from foretaster.rules.parse_problems import ParseProblems
 from foretaster.rules.secrets import PlaintextSecret
 from foretaster.rules.shell import ShellCommand
@@ -38,4 +39,7 @@ ALL_RULES: tuple[type[Rule], ...] = (
     LethalTrifecta,
 )
 
-__all__ = ["ALL_RULES", "Rule", "RuleMeta", "ScanTarget"]
+OPTIONAL_RULES: tuple[type[Rule], ...] = (LlmReview,)
+"""Rules that run only on request and need something supplied to them."""
+
+__all__ = ["ALL_RULES", "OPTIONAL_RULES", "LlmReview", "Rule", "RuleMeta", "ScanTarget"]
